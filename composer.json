@@ -20,9 +20,6 @@
   "require-dev": {
     "phpunit/phpunit": "~4.1"
   },
-  "suggest": {
-      "treehouselabs/swift-client": "For the maintained counterpart of this library"
-  },
   "autoload": {
       "psr-4": { "TreeHouse\\Swift\\": "src/TreeHouse/Swift" }
   }
