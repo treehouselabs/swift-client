@@ -68,7 +68,7 @@ class SwiftDriver implements DriverInterface
      *
      * @return RequestInterface
      */
-    protected function getRequest($method, $path, array $query = null, array $headers = array(), $body = null)
+    protected function getRequest($method, $path, array $query = null, array $headers = [], $body = null)
     {
         if (!empty($query)) {
             $path .= '?' . http_build_query($query);
@@ -101,7 +101,7 @@ class SwiftDriver implements DriverInterface
      *
      * @return Response
      */
-    protected function request($method, $path, array $query = null, array $headers = array(), $body = null)
+    protected function request($method, $path, array $query = null, array $headers = [], $body = null)
     {
         $request = $this->getRequest($method, $path, $query, $headers, $body);
 
@@ -121,7 +121,7 @@ class SwiftDriver implements DriverInterface
      *
      * @return Response
      */
-    public function head($path, array $query = null, array $headers = array())
+    public function head($path, array $query = null, array $headers = [])
     {
         return $this->request('head', $path, $query, $headers);
     }
@@ -135,7 +135,7 @@ class SwiftDriver implements DriverInterface
      *
      * @return Response
      */
-    public function get($path, array $query = null, array $headers = array())
+    public function get($path, array $query = null, array $headers = [])
     {
         return $this->request('get', $path, $query, $headers);
     }
@@ -150,7 +150,7 @@ class SwiftDriver implements DriverInterface
      *
      * @return Response
      */
-    public function put($path, array $query = null, array $headers = array(), $body = null)
+    public function put($path, array $query = null, array $headers = [], $body = null)
     {
         return $this->request('put', $path, $query, $headers, $body);
     }
@@ -165,7 +165,7 @@ class SwiftDriver implements DriverInterface
      *
      * @return Response
      */
-    public function post($path, array $query = null, array $headers = array(), $body = null)
+    public function post($path, array $query = null, array $headers = [], $body = null)
     {
         return $this->request('post', $path, $query, $headers, $body);
     }
@@ -179,7 +179,7 @@ class SwiftDriver implements DriverInterface
      *
      * @return Response
      */
-    public function copy($path, array $query = null, array $headers = array())
+    public function copy($path, array $query = null, array $headers = [])
     {
         return $this->request('copy', $path, $query, $headers);
     }
@@ -193,7 +193,7 @@ class SwiftDriver implements DriverInterface
      *
      * @return Response
      */
-    public function delete($path, array $query = null, array $headers = array())
+    public function delete($path, array $query = null, array $headers = [])
     {
         return $this->request('delete', $path, $query, $headers);
     }
@@ -373,7 +373,7 @@ class SwiftDriver implements DriverInterface
      *
      * @return \Guzzle\Http\EntityBodyInterface|string
      */
-    public function getObjectContent(Object $object, $asString = true, array $headers = array())
+    public function getObjectContent(Object $object, $asString = true, array $headers = [])
     {
         $response = $this->get($object->getPath(), null, $headers);
 
@@ -456,7 +456,7 @@ class SwiftDriver implements DriverInterface
                             }
 
                             $path = parse_url($response->getEffectiveUrl(), PHP_URL_PATH);
-                            list($containerName, $name) = explode('/', ltrim($path, '/'), 2);
+                            list(, $name) = explode('/', ltrim($path, '/'), 2);
 
                             $result[] = $this->createObject($container, $name, $response);
                         }
