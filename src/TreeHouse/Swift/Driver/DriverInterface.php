@@ -2,15 +2,16 @@
 
 namespace TreeHouse\Swift\Driver;
 
-use Guzzle\Http\Message\Response;
+use GuzzleHttp\Message\ResponseInterface;
+use GuzzleHttp\Stream\StreamInterface;
 use TreeHouse\Swift\Container;
 use TreeHouse\Swift\Exception\SwiftException;
-use TreeHouse\Swift\Object;
+use TreeHouse\Swift\Object as SwiftObject;
 
 interface DriverInterface
 {
     /**
-     * Perform HEAD request
+     * Perform HEAD request.
      *
      * @param string $path
      * @param array  $query
@@ -18,12 +19,12 @@ interface DriverInterface
      *
      * @throws SwiftException
      *
-     * @return Response
+     * @return ResponseInterface
      */
     public function head($path, array $query = null, array $headers = []);
 
     /**
-     * Perform GET request
+     * Perform GET request.
      *
      * @param string $path
      * @param array  $query
@@ -31,12 +32,12 @@ interface DriverInterface
      *
      * @throws SwiftException
      *
-     * @return Response
+     * @return ResponseInterface
      */
     public function get($path, array $query = null, array $headers = []);
 
     /**
-     * Perform PUT request
+     * Perform PUT request.
      *
      * @param string $path
      * @param array  $query
@@ -45,12 +46,12 @@ interface DriverInterface
      *
      * @throws SwiftException
      *
-     * @return Response
+     * @return ResponseInterface
      */
     public function put($path, array $query = null, array $headers = [], $body = null);
 
     /**
-     * Perform POST request
+     * Perform POST request.
      *
      * @param string $path
      * @param array  $query
@@ -59,12 +60,12 @@ interface DriverInterface
      *
      * @throws SwiftException
      *
-     * @return Response
+     * @return ResponseInterface
      */
     public function post($path, array $query = null, array $headers = [], $body = null);
 
     /**
-     * Perform COPY request
+     * Perform COPY request.
      *
      * @param string $path
      * @param array  $query
@@ -72,36 +73,37 @@ interface DriverInterface
      *
      * @throws SwiftException
      *
-     * @return Response
+     * @return ResponseInterface
      */
     public function copy($path, array $query = null, array $headers = []);
 
     /**
-     * Perform DELETE request
+     * Perform DELETE request.
      *
      * @param string $path
      * @param array  $query
      * @param array  $headers
+     * @param string $body
      *
      * @throws SwiftException
      *
-     * @return Response
+     * @return ResponseInterface
      */
-    public function delete($path, array $query = null, array $headers = []);
+    public function delete($path, array $query = null, array $headers = [], $body = null);
 
     /**
-     * Create a container
+     * Create a container.
      *
      * @param Container $container
      *
-     * @throws SwiftException
+     * @throws SwiftException When the creation failed
      *
-     * @return Container
+     * @return boolean True on success, an exception is thrown otherwise
      */
     public function createContainer(Container $container);
 
     /**
-     * Check if a container exists
+     * Check if a container exists.
      *
      * @param Container $container
      *
@@ -112,22 +114,22 @@ interface DriverInterface
     public function containerExists(Container $container);
 
     /**
-     * Get container by name
+     * Get container by name.
      *
      * @param string $name
      *
      * @throws SwiftException
      *
-     * @return Container
+     * @return Container|null
      */
     public function getContainer($name);
 
     /**
      * @param Container $container
      *
-     * @throws SwiftException
+     * @throws SwiftException When container was not found
      *
-     * @return boolean
+     * @return boolean True on success, an exception is thrown otherwise
      */
     public function updateContainer(Container $container);
 
@@ -136,41 +138,41 @@ interface DriverInterface
      *
      * @throws SwiftException
      *
-     * @return boolean
+     * @return boolean True on success, an exception is thrown otherwise
      */
     public function deleteContainer(Container $container);
 
     /**
-     * Check if an object exists
+     * Check if an object exists.
      *
-     * @param \TreeHouse\Swift\Object $object
-     *
-     * @throws SwiftException
-     *
-     * @return bool
-     */
-    public function objectExists(Object $object);
-
-    /**
-     * Create an object
-     *
-     * @param Container $container
-     * @param string    $name
-     * @param Response  $response
-     *
-     * @return \TreeHouse\Swift\Object
-     */
-    public function createObject(Container $container, $name, Response $response = null);
-
-    /**
-     * Get an object by name
-     *
-     * @param Container $container
-     * @param string    $name
+     * @param SwiftObject $object
      *
      * @throws SwiftException
      *
-     * @return \TreeHouse\Swift\Object
+     * @return boolean
+     */
+    public function objectExists(SwiftObject $object);
+
+    /**
+     * Create an object.
+     *
+     * @param Container         $container
+     * @param string            $name
+     * @param ResponseInterface $response
+     *
+     * @return SwiftObject
+     */
+    public function createObject(Container $container, $name, ResponseInterface $response = null);
+
+    /**
+     * Get an object by name.
+     *
+     * @param Container $container
+     * @param string    $name
+     *
+     * @throws SwiftException
+     *
+     * @return SwiftObject|null
      */
     public function getObject(Container $container, $name);
 
@@ -180,82 +182,83 @@ interface DriverInterface
      * @param Container $container
      * @param string    $prefix
      * @param string    $delimiter
-     * @param integer   $limit
-     * @param integer   $start
-     * @param integer   $end
+     * @param int       $limit
+     * @param int       $start
+     * @param int       $end
      *
      * @throws SwiftException
      *
-     * @return array
+     * @return SwiftObject[]
      */
     public function getObjects(Container $container, $prefix = null, $delimiter = null, $limit = null, $start = null, $end = null);
 
     /**
-     * Return object url
+     * Return object url.
      *
-     * @param \TreeHouse\Swift\Object $object
+     * @param SwiftObject $object
      *
      * @throws SwiftException
      *
      * @return string
      */
-    public function getObjectUrl(Object $object);
+    public function getObjectUrl(SwiftObject $object);
 
     /**
-     * @param \TreeHouse\Swift\Object $object
-     * @param boolean                 $asString
-     * @param array                   $headers
+     * @param SwiftObject $object
+     * @param bool        $asString
+     * @param array       $headers
+     *
+     * @throws SwiftException When anything other than the expected outcome
+     *                        occurred, eg: when the object was not found.
+     *
+     * @return StreamInterface|mixed
+     */
+    public function getObjectContent(SwiftObject $object, $asString = true, array $headers = []);
+
+    /**
+     * @param SwiftObject $object
      *
      * @throws SwiftException
      *
-     * @return mixed
+     * @return boolean True on success, an exception is thrown otherwise
      */
-    public function getObjectContent(Object $object, $asString = true, array $headers = []);
+    public function updateObject(SwiftObject $object);
 
     /**
-     * @param \TreeHouse\Swift\Object $object
+     * @param SwiftObject $object
      *
      * @throws SwiftException
      *
      * @return boolean
      */
-    public function updateObject(Object $object);
+    public function updateObjectMetadata(SwiftObject $object);
 
     /**
-     * @param \TreeHouse\Swift\Object $object
+     * @param SwiftObject $object
      *
      * @throws SwiftException
      *
      * @return boolean
      */
-    public function updateObjectMetadata(Object $object);
+    public function deleteObject(SwiftObject $object);
 
     /**
-     * @param \TreeHouse\Swift\Object $object
+     * @param SwiftObject[] $objects
      *
      * @throws SwiftException
      *
-     * @return boolean
-     */
-    public function deleteObject(Object $object);
-
-    /**
-     * @param array $objects
-     *
-     * @throws SwiftException
-     *
-     * @return boolean
+     * @return integer The number of removed objects
      */
     public function deleteObjects(array $objects);
 
     /**
-     * @param \TreeHouse\Swift\Object $object
-     * @param Container               $toContainer
-     * @param string                  $name
+     * @param SwiftObject $object
+     * @param Container   $toContainer
+     * @param string      $name
      *
-     * @throws SwiftException
+     * @throws SwiftException When the copy operation failed
      *
-     * @return boolean
+     * @return SwiftObject The newly created object
      */
-    public function copyObject(Object $object, Container $toContainer, $name);
+    public function copyObject(SwiftObject $object, Container $toContainer, $name);
 }

@@ -2,19 +2,23 @@
 
 namespace TreeHouse\Swift\Driver;
 
-use Guzzle\Http\Exception\MultiTransferException;
-use Guzzle\Http\Message\RequestInterface;
-use Guzzle\Http\Message\Response;
+use GuzzleHttp\ClientInterface;
+use GuzzleHttp\Exception\BadResponseException;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Exception\TransferException;
+use GuzzleHttp\Message\RequestInterface;
+use GuzzleHttp\Message\ResponseInterface;
+use GuzzleHttp\Pool;
 use Psr\Log\LoggerInterface;
-use TreeHouse\Keystone\Client\Client;
+use Psr\Log\NullLogger;
 use TreeHouse\Swift\Container;
 use TreeHouse\Swift\Exception\SwiftException;
-use TreeHouse\Swift\Object;
+use TreeHouse\Swift\Object as SwiftObject;
 
 class SwiftDriver implements DriverInterface
 {
     /**
-     * @var Client
+     * @var ClientInterface
      */
     protected $client;
 
@@ -24,24 +28,17 @@ class SwiftDriver implements DriverInterface
     protected $logger;
 
     /**
-     * @var boolean
-     */
-    protected $debug;
-
-    /**
-     * @param Client          $client
-     * @param boolean         $debug
+     * @param ClientInterface $client
      * @param LoggerInterface $logger
      */
-    public function __construct(Client $client, $debug, LoggerInterface $logger = null)
+    public function __construct(ClientInterface $client, LoggerInterface $logger = null)
     {
         $this->client = $client;
-        $this->debug  = $debug;
-        $this->logger = $logger;
+        $this->logger = $logger ?: new NullLogger();
     }
 
     /**
-     * @return Client
+     * @return ClientInterface
      */
     public function getClient()
     {
@@ -51,75 +48,13 @@ class SwiftDriver implements DriverInterface
     /**
      * @return string
      */
-    public function getPublicUrl()
+    public function getBaseUrl()
     {
-        return $this->client->getPublicUrl();
+        return $this->client->getBaseUrl();
     }
 
     /**
-     * @param string $method
-     * @param string $path
-     * @param array  $query
-     * @param array  $headers
-     * @param string $body
-     *
-     * @throws SwiftException
-     * @throws \InvalidArgumentException
-     *
-     * @return RequestInterface
-     */
-    protected function getRequest($method, $path, array $query = null, array $headers = [], $body = null)
-    {
-        if (!empty($query)) {
-            $path .= '?' . http_build_query($query);
-        }
-
-        switch ($method) {
-            case 'head':
-            case 'get':
-                return $request = $this->client->$method($path, $headers);
-            case 'delete':
-            case 'put':
-            case 'patch':
-            case 'post':
-                return $request = $this->client->$method($path, $headers, $body);
-            case 'copy':
-                return $this->client->createRequest('COPY', $path, $headers);
-            default:
-                throw new \InvalidArgumentException(sprintf('Unsupported request method "%s"', $method));
-        }
-    }
-
-    /**
-     * @param string $method
-     * @param string $path
-     * @param array  $query
-     * @param array  $headers
-     * @param string $body
-     *
-     * @throws SwiftException
-     *
-     * @return Response
-     */
-    protected function request($method, $path, array $query = null, array $headers = [], $body = null)
-    {
-        $request = $this->getRequest($method, $path, $query, $headers, $body);
-
-        try {
-            return $request->send();
-        } catch (\Exception $e) {
-            throw new SwiftException($e->getMessage());
-        }
-    }
-
-    /**
-     * @param string $path
-     * @param array  $query
-     * @param array  $headers
-     *
-     * @throws SwiftException
-     *
-     * @return Response
+     * @inheritdoc
      */
     public function head($path, array $query = null, array $headers = [])
     {
@@ -127,13 +62,7 @@ class SwiftDriver implements DriverInterface
     }
 
     /**
-     * @param string $path
-     * @param array  $query
-     * @param array  $headers
-     *
-     * @throws SwiftException
-     *
-     * @return Response
+     * @inheritdoc
      */
     public function get($path, array $query = null, array $headers = [])
     {
@@ -141,14 +70,7 @@ class SwiftDriver implements DriverInterface
     }
 
     /**
-     * @param string $path
-     * @param array  $query
-     * @param array  $headers
-     * @param string $body
-     *
-     * @throws SwiftException
-     *
-     * @return Response
+     * @inheritdoc
      */
     public function put($path, array $query = null, array $headers = [], $body = null)
     {
@@ -156,14 +78,7 @@ class SwiftDriver implements DriverInterface
     }
 
     /**
-     * @param string $path
-     * @param array  $query
-     * @param array  $headers
-     * @param string $body
-     *
-     * @throws SwiftException
-     *
-     * @return Response
+     * @inheritdoc
      */
     public function post($path, array $query = null, array $headers = [], $body = null)
     {
@@ -171,13 +86,7 @@ class SwiftDriver implements DriverInterface
     }
 
     /**
-     * @param string $path
-     * @param array  $query
-     * @param array  $headers
-     *
-     * @throws SwiftException
-     *
-     * @return Response
+     * @inheritdoc
      */
     public function copy($path, array $query = null, array $headers = [])
     {
@@ -185,47 +94,36 @@ class SwiftDriver implements DriverInterface
     }
 
     /**
-     * @param string $path
-     * @param array  $query
-     * @param array  $headers
-     *
-     * @throws SwiftException
-     *
-     * @return Response
+     * @inheritdoc
      */
-    public function delete($path, array $query = null, array $headers = [])
+    public function delete($path, array $query = null, array $headers = [], $body = null)
     {
-        return $this->request('delete', $path, $query, $headers);
+        return $this->request('delete', $path, $query, $headers, $body);
     }
 
     /**
-     * @param \TreeHouse\Swift\Object $object
-     *
-     * @return string
+     * @inheritdoc
      */
-    public function getObjectUrl(Object $object)
+    public function getObjectUrl(SwiftObject $object)
     {
-        return sprintf('%s/%s', $this->getPublicUrl(), $object->getPath());
+        return sprintf('%s/%s', $this->getBaseUrl(), $object->getPath());
     }
 
     /**
-     * @param Container $container
-     *
-     * @throws SwiftException
-     *
-     * @return boolean
+     * @inheritdoc
      */
     public function containerExists(Container $container)
     {
-        return $this->head($container->getName())->isSuccessful();
+        $response = $this->head($container->getName());
+
+        return $this->assertResponse($response, [
+            204 => true,
+            404 => false
+        ]);
     }
 
     /**
-     * @param Container $container
-     *
-     * @throws SwiftException
-     *
-     * @return boolean
+     * @inheritdoc
      */
     public function createContainer(Container $container)
     {
@@ -234,73 +132,53 @@ class SwiftDriver implements DriverInterface
             $container->getMetadata()->set('Read', '.r:*');
         }
 
-        try {
-            $response = $this->put($container->getName(), null, $container->getHeaders());
+        $response = $this->put($container->getName(), null, $container->getHeaders());
 
-            return $response->isSuccessful();
-        } catch (\Exception $e) {
-            throw new SwiftException(
-                sprintf('Error putting container "%s": %s', $container->getName(), $e->getMessage())
-            );
-        }
+        return $this->assertResponse($response, [
+            201 => true,
+            202 => true
+        ]);
     }
 
     /**
-     * @param string $name
-     *
-     * @throws SwiftException
-     *
-     * @return Container
+     * @inheritdoc
      */
     public function getContainer($name)
     {
-        try {
-            $response = $this->head($name);
-        } catch (\Exception $e) {
-            return null;
-        }
+        $response = $this->head($name);
 
-        if (!$response->isSuccessful()) {
-            return null;
-        }
-
-        return Container::create($name, $response->getHeaders()->toArray());
+        return $this->assertResponse($response, [
+            200 => Container::create($name, $response->getHeaders()),
+            404 => null
+        ]);
     }
 
     /**
-     * @param Container $container
-     *
-     * @throws SwiftException
-     *
-     * @return boolean
+     * @inheritdoc
      */
     public function updateContainer(Container $container)
     {
+        $this->logger->info(sprintf('Updating container "%s"', $container->getName()));
+
         // make readable for public
         if ($container->isPublic()) {
             $container->getMetadata()->set('Read', '.r:*');
         }
 
-        try {
-            $response = $this->post($container->getName(), null, $container->getHeaders());
+        $response = $this->post($container->getName(), null, $container->getHeaders());
 
-            return $response->isSuccessful();
-        } catch (\Exception $e) {
-            throw new SwiftException(
-                sprintf('Error updating metadata of container "%s": %s', $container->getName(), $e->getMessage())
-            );
-        }
+        return $this->assertResponse($response, [
+            204 => true,
+        ]);
     }
 
     /**
-     * @param Container $container
-     *
-     * @throws SwiftException
-     *
-     * @return boolean
+     * @inheritdoc
      */
     public function deleteContainer(Container $container)
     {
+        $this->logger->info(sprintf('Deleting container "%s"', $container->getName()));
+
         // empty container first
         foreach ($this->getObjects($container) as $object) {
             $this->deleteObject($object);
@@ -308,95 +186,73 @@ class SwiftDriver implements DriverInterface
 
         $response = $this->delete($container->getName());
 
-        return $response->isSuccessful() || ($response->getStatusCode() === 404);
+        return $this->assertResponse($response, [
+            204 => true,
+            404 => true
+        ]);
     }
 
     /**
-     * @param \TreeHouse\Swift\Object $object
-     *
-     * @throws SwiftException
-     *
-     * @return boolean
+     * @inheritdoc
      */
-    public function objectExists(Object $object)
+    public function objectExists(SwiftObject $object)
     {
-        return $this->head($object->getPath())->isSuccessful();
+        $response = $this->head($object->getPath());
+
+        return $this->assertResponse($response, [
+            204 => true,
+            404 => false
+        ]);
     }
 
     /**
-     * @param Container $container
-     * @param string    $name
-     * @param Response  $response
-     *
-     * @return \TreeHouse\Swift\Object
+     * @inheritdoc
      */
-    public function createObject(Container $container, $name, Response $response = null)
+    public function createObject(Container $container, $name, ResponseInterface $response = null)
     {
-        $headers = $response ? $response->getHeaders()->toArray() : array();
+        $headers = $response ? $response->getHeaders() : [];
 
-        return Object::create($container, $name, $headers);
+        return SwiftObject::create($container, $name, $headers);
     }
 
     /**
-     * @param Container $container
-     * @param string    $name
-     *
-     * @throws SwiftException
-     *
-     * @return \TreeHouse\Swift\Object
+     * @inheritdoc
      */
     public function getObject(Container $container, $name)
     {
-        $path = sprintf('%s/%s', $container->getName(), $name);
+        $response = $this->head(sprintf('%s/%s', $container->getName(), $name));
 
-        try {
-            $response = $this->head($path);
-        } catch (\Exception $e) {
-            return null;
-        }
-
-        if (!$response->isSuccessful()) {
-            return null;
-        }
-
-        $object = $this->createObject($container, $name, $response);
-
-        return $object;
+        return $this->assertResponse($response, [
+            204 => $this->createObject($container, $name, $response),
+            404 => null,
+        ]);
     }
 
     /**
-     * @param \TreeHouse\Swift\Object $object
-     * @param boolean                 $asString
-     * @param array                   $headers
-     *
-     * @throws SwiftException
-     *
-     * @return \Guzzle\Http\EntityBodyInterface|string
+     * @inheritdoc
      */
-    public function getObjectContent(Object $object, $asString = true, array $headers = [])
+    public function getObjectContent(SwiftObject $object, $asString = true, array $headers = [])
     {
         $response = $this->get($object->getPath(), null, $headers);
 
-        return $response->getBody($asString);
+        // make sure the response is correct
+        $this->assertResponse($response, [200 => true]);
+
+        $body = $response->getBody();
+
+        if ($asString) {
+            $body = $body->getContents();
+        }
+
+        return $body;
     }
 
     /**
-     * Get objects inside a container, optionally filtered by prefix/delimiter.
-     *
-     * @param Container $container
-     * @param string    $prefix
-     * @param string    $delimiter
-     * @param integer   $limit
-     * @param integer   $start
-     * @param integer   $end
-     *
-     * @throws SwiftException
-     *
-     * @return array
+     * @inheritdoc
      */
     public function getObjects(Container $container, $prefix = null, $delimiter = null, $limit = null, $start = null, $end = null)
     {
-        $query = array();
+        $query = [];
 
         if (!is_null($prefix)) {
             $query['prefix'] = $prefix;
@@ -418,78 +274,69 @@ class SwiftDriver implements DriverInterface
             $query['end_marker'] = $end;
         }
 
-        $result = array();
+        $this->logger->info(sprintf('Listing objects in container "%s"', $container->getName()), $query);
+
+        $result = [];
 
         $response = $this->get($container->getName(), $query);
-        $content = trim($response->getBody(true));
+        $content  = trim($response->getBody(true));
 
         if ($content !== '') {
-            $objects = explode("\n", $content);
-            if (!empty($objects)) {
-                $requests = array();
+            $requests = [];
+            foreach (explode("\n", $content) as $path) {
+                // if path ends with delimiter, it's a pseudo-dir
+                if (!is_null($delimiter) && (substr($path, -1) === $delimiter)) {
+                    $object = SwiftObject::create($container, $path);
+                    $object->setContentType('application/directory');
+                    $result[$path] = $object;
 
-                foreach ($objects as $path) {
-                    // if path ends with delimiter, it's a pseudo-dir
-                    if (!is_null($delimiter) && (substr($path, -1) === $delimiter)) {
-                        $object = Object::create($container, $path);
-                        $object->setContentType('application/directory');
-                        $result[] = $object;
-                    } else {
-                        $requests[] = $this->getRequest('head', sprintf('%s/%s', $container->getName(), $path));
-                    }
+                    $this->logger->debug(sprintf('=> "%s"', $object->getPath()));
+                } else {
+                    $objectPath    = sprintf('%s/%s', $container->getName(), $path);
+                    $requests[]    = $this->createRequest('head', $objectPath);
+                    $result[$path] = null;
+
+                    $this->logger->debug(sprintf('=> "%s"', $objectPath));
+                }
+            }
+
+            $this->logger->info('Getting objects metadata');
+
+            if (!empty($requests)) {
+                $results = Pool::batch($this->client, $requests);
+
+                if (!empty($failures = $results->getFailures())) {
+                    $messages = array_map(function (\Exception $e) {
+                        return $e->getMessage();
+                    }, $failures);
+
+                    throw new SwiftException(
+                        sprintf(
+                            'Could not get all objects for container "%s" with params %s. Failed requests:%s',
+                            $container->getName(),
+                            json_encode($query),
+                            PHP_EOL . implode(PHP_EOL, $messages)
+                        )
+                    );
                 }
 
-                if (!empty($requests)) {
-                    try {
-                        /** @var Response[] $responses */
-                        $responses = $this->client->send($requests);
-                        foreach ($responses as $response) {
-                            if (!$response->isSuccessful()) {
-                                throw new SwiftException(
-                                    sprintf(
-                                        'Could not get object "%s": %s (%s)',
-                                        $response->getEffectiveUrl(),
-                                        $response->getStatusCode(),
-                                        $response->getReasonPhrase()
-                                    )
-                                );
-                            }
+                /** @var ResponseInterface $response */
+                foreach ($results->getSuccessful() as $response) {
+                    $path = parse_url($response->getEffectiveUrl(), PHP_URL_PATH);
+                    list(, $name) = explode('/', ltrim($path, '/'), 2);
 
-                            $path = parse_url($response->getEffectiveUrl(), PHP_URL_PATH);
-                            list(, $name) = explode('/', ltrim($path, '/'), 2);
-
-                            $result[] = $this->createObject($container, $name, $response);
-                        }
-                    } catch (MultiTransferException $e) {
-                        // NOTE: we could be less harsh here and just log the error
-                        // the exception contains information about all requests:
-                        // - $e->getFailedRequests()
-                        // - $e->getSuccessfulRequests()
-                        // see http://guzzlephp.org/http-client/client.html#sending-requests-in-parallel
-                        throw new SwiftException(
-                            sprintf(
-                                'Could not get all objects for container "%s" with params %s. Reason: %s',
-                                $container->getName(),
-                                json_encode($query),
-                                $e->getMessage()
-                            )
-                        );
-                    }
+                    $result[$name] = $this->createObject($container, $name, $response);
                 }
             }
         }
 
-        return $result;
+        return array_values($result);
     }
 
     /**
-     * @param \TreeHouse\Swift\Object $object
-     *
-     * @throws SwiftException
-     *
-     * @return boolean
+     * @inheritdoc
      */
-    public function updateObject(Object $object)
+    public function updateObject(SwiftObject $object)
     {
         // persist container
         $this->updateContainer($object->getContainer());
@@ -500,111 +347,214 @@ class SwiftDriver implements DriverInterface
             return $this->updateObjectMetadata($object);
         }
 
-        try {
-            // timestamp the object
-            $object->setLastModifiedDate(new \DateTime());
-            $response = $this->put($object->getPath(), null, $object->getUpdateHeaders(), $object->getBody());
+        // timestamp the object
+        $object->setLastModifiedDate(new \DateTime());
 
-            return $response->isSuccessful();
-        } catch (\Exception $e) {
-            throw new SwiftException(sprintf('Error updating object "%s": %s', $object->getPath(), $e->getMessage()));
-        }
+        $this->logger->info(sprintf('Updating object "%s"', $object->getPath()));
+
+        $response = $this->put($object->getPath(), null, $object->getUpdateHeaders(), $object->getBody());
+
+        return $this->assertResponse($response, [
+            201 => true,
+        ]);
     }
 
     /**
-     * @param \TreeHouse\Swift\Object $object
-     *
-     * @throws SwiftException
-     *
-     * @return boolean
+     * @inheritdoc
      */
-    public function updateObjectMetadata(Object $object)
+    public function updateObjectMetadata(SwiftObject $object)
     {
-        try {
-            $response = $this->post($object->getPath(), null, $object->getUpdateHeaders());
+        $this->logger->info(sprintf('Updating metadata for "%s"', $object->getPath()));
 
-            return $response->isSuccessful();
-        } catch (\Exception $e) {
-            throw new SwiftException(sprintf('Error updating metadata for object "%s": %s', $object->getPath(), $e->getMessage()));
-        }
+        $response = $this->post($object->getPath(), null, $object->getUpdateHeaders());
+
+        return $this->assertResponse($response, [
+            202 => true,
+        ]);
     }
 
     /**
-     * @param \TreeHouse\Swift\Object $object
-     *
-     * @throws SwiftException
-     *
-     * @return boolean
+     * @inheritdoc
      */
-    public function deleteObject(Object $object)
+    public function deleteObject(SwiftObject $object)
     {
-        return $this->delete($object->getPath())->isSuccessful();
+        $this->logger->info(sprintf('Deleting "%s"', $object->getPath()));
+
+        $response = $this->delete($object->getPath());
+
+        return $this->assertResponse($response, [
+            204 => true,
+            404 => true,
+        ]);
     }
 
     /**
-     * @param \TreeHouse\Swift\Object[] $objects
-     *
-     * @throws SwiftException
-     *
-     * @return integer
+     * @inheritdoc
      */
     public function deleteObjects(array $objects)
     {
-        $requests = array();
+        $requests = [];
 
+        /** @var SwiftObject $object */
         foreach ($objects as $object) {
             if ($object->isPseudoDir()) {
                 continue;
             }
 
-            $requests[] = $this->getRequest('delete', $object->getPath());
+            $requests[] = $this->createRequest('delete', $object->getPath());
+
+            $this->logger->debug(sprintf('Deleting "%s"', $object->getPath()));
         }
 
         $numRemoved = 0;
 
         if (!empty($requests)) {
-            try {
-                /** @var Response[] $responses */
-                $responses = $this->client->send($requests);
-                foreach ($responses as $response) {
-                    if ($response->isSuccessful()) {
-                        $numRemoved++;
+            $results = Pool::batch($this->client, $requests);
+
+            /** @var RequestException[] $failures */
+            if (!empty($failures = $results->getFailures())) {
+                $error = false;
+                foreach ($failures as $failure) {
+                    if ($failure instanceof BadResponseException && ($response = $failure->getResponse()) && ($response->getStatusCode() === 404)) {
+                        continue;
                     }
+
+                    $error = true;
+                    $this->logger->error(sprintf('Error deleting: %s', $failure->getMessage()));
                 }
-            } catch (MultiTransferException $e) {
-                throw new SwiftException(sprintf('Could not delete objects. Reason: %s', $e->getMessage()));
+
+                if ($error) {
+                    throw new SwiftException('Could not delete all objects.');
+                }
+            }
+
+            /** @var ResponseInterface $response */
+            foreach ($results->getSuccessful() as $response) {
+                if ($this->assertResponse($response, [204 => true])) {
+                    $numRemoved++;
+                }
             }
         }
+
+        $this->logger->info(sprintf('Deleted %d objects', $numRemoved));
 
         return $numRemoved;
     }
 
     /**
-     * @param \TreeHouse\Swift\Object $object
-     * @param Container               $toContainer
-     * @param string                  $name
+     * @inheritdoc
+     */
+    public function copyObject(SwiftObject $object, Container $toContainer, $name)
+    {
+        $destination = sprintf('/%s/%s', $toContainer->getName(), $name);
+        $headers     = ['Destination' => $destination];
+
+        $this->logger->info(sprintf('Copying "%s" => "%s"', $object->getPath(), $destination));
+
+        $response = $this->copy($object->getPath(), null, $headers);
+
+        return $this->assertResponse($response, [
+            201 => function () use ($toContainer, $name) {
+                return $this->getObject($toContainer, $name);
+            },
+        ]);
+    }
+
+    /**
+     * @param string $method
+     * @param string $path
+     * @param array  $query
+     * @param array  $headers
+     * @param string $body
+     *
+     * @throws SwiftException
+     * @throws \InvalidArgumentException
+     *
+     * @return RequestInterface
+     */
+    protected function createRequest($method, $path, array $query = null, array $headers = [], $body = null)
+    {
+        if (!empty($query)) {
+            $path .= (false === strpos($path, '?') ? '?' : '&') . http_build_query($query);
+        }
+
+        $options = [
+            'headers' => $headers,
+            'body'    => $body,
+        ];
+
+        return $this->client->createRequest($method, $path, $options);
+    }
+
+    /**
+     * @param string $method
+     * @param string $path
+     * @param array  $query
+     * @param array  $headers
+     * @param string $body
      *
      * @throws SwiftException
      *
-     * @return \TreeHouse\Swift\Object
+     * @return ResponseInterface
      */
-    public function copyObject(Object $object, Container $toContainer, $name)
+    protected function request($method, $path, array $query = null, array $headers = [], $body = null)
     {
-        $destination = sprintf('/%s/%s', $toContainer->getName(), $name);
-        $headers = array('Destination' => $destination);
+        $request = $this->createRequest($method, $path, $query, $headers, $body);
+
+        $this->logger->debug((string) $request);
 
         try {
-            $response = $this->copy($object->getPath(), null, $headers);
-
-            if ($response->isSuccessful()) {
-                return $this->getObject($toContainer, $name);
+            return $this->client->send($request);
+        } catch (BadResponseException $e) {
+            // If we got a response, let the caller handle this.
+            // This is because possible 'faulty' response codes, such as 404 or
+            // 411 can be handled properly.
+            if ($e->hasResponse()) {
+                return $e->getResponse();
             }
-        } catch (\Exception $e) {
-            throw new SwiftException(
-                sprintf('Error copying object "%s" to "%s": %s', $object->getPath(), $destination, $e->getMessage())
-            );
+
+            // ok got no response, this is bad
+            $this->logger->error($e->getMessage());
+
+            throw new SwiftException($e->getMessage(), null, $e);
+        } catch (TransferException $e) {
+            // these are other exceptions: connection failures, parse errors, etc.
+            $this->logger->error($e->getMessage());
+
+            throw new SwiftException($e->getMessage(), null, $e);
+        }
+    }
+
+    /**
+     * Checks response for any matching status, and returns that outcome.
+     *
+     * @param ResponseInterface $response
+     * @param array             $statuses
+     *
+     * @throws SwiftException When none of the expected statuses matched the response
+     *
+     * @return mixed
+     */
+    protected function assertResponse(ResponseInterface $response, array $statuses)
+    {
+        $statusCode = $response->getStatusCode();
+
+        if (array_key_exists($statusCode, $statuses)) {
+            $result = $statuses[$statusCode];
+
+            if (is_callable($result)) {
+                $result = $result();
+            }
+
+            return $result;
         }
 
-        return null;
+        throw new SwiftException(
+            sprintf(
+                'Expected status to be one of %s, but got %s',
+                json_encode(array_keys($statuses)),
+                $statusCode
+            )
+        );
     }
 }
