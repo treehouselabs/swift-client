@@ -4,6 +4,8 @@ namespace TreeHouse\Swift\Tests\Swift;
 
 use Symfony\Component\HttpFoundation\File\File;
 use TreeHouse\Swift\Container;
+use TreeHouse\Swift\Driver\DriverInterface;
+use TreeHouse\Swift\Object as SwiftObject;
 use TreeHouse\Swift\ObjectStore;
 
 class ObjectStoreTest extends \PHPUnit_Framework_TestCase
@@ -14,427 +16,484 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
     protected $store;
 
     /**
-     * @var Container
+     * @var \PHPUnit_Framework_MockObject_MockObject|DriverInterface
      */
-    protected $testContainer;
+    protected $driver;
+
+    protected function setUp()
+    {
+        $this->driver = $this->getMockForAbstractClass(DriverInterface::class);
+        $this->store  = new ObjectStore($this->driver);
+    }
 
     /**
-     * @var string
+     * @dataProvider httpMethodsProvider
      */
-    protected $testContainerName = 'test';
+    public function testHttpMethod($method, array $args)
+    {
+        $mock = $this->driver->expects($this->once())->method($method);
+        call_user_func_array([$mock, 'with'], $args);
+
+        call_user_func_array([$this->store, $method], $args);
+    }
+
+    public function httpMethodsProvider()
+    {
+        $path    = '/foo';
+        $query   = ['bar' => 'baz'];
+        $headers = ['baz' => 'qux'];
+        $body    = 'foobar';
+
+        return [
+            ['head', [$path, $query, $headers]],
+            ['get', [$path, $query, $headers]],
+            ['post', [$path, $query, $headers, $body]],
+            ['put', [$path, $query, $headers, $body]],
+            ['delete', [$path, $query, $headers, $body]],
+        ];
+    }
 
     /**
-     * @var array
+     * @expectedException        \TreeHouse\Swift\Exception\SwiftException
+     * @expectedExceptionMessage Object container is private
      */
-    protected $tempfiles = [];
+    public function testGetObjectUrlOnPrivateContainer()
+    {
+        $object = new SwiftObject(new Container('foo'), 'bar');
+        $this->store->getObjectUrl($object);
+    }
+
+    public function testGetObjectUrl()
+    {
+        $container = new Container('foo');
+        $container->setPublic();
+
+        $url    = 'http://swift.example.org/container/object';
+        $object = new SwiftObject($container, 'bar');
+
+        $this->driver
+            ->expects($this->once())
+            ->method('getObjectUrl')
+            ->with($object)
+            ->willReturn($url);
+
+        $this->assertEquals($url, $this->store->getObjectUrl($object));
+    }
 
     public function testCreateContainer()
     {
-        $container = $this->store->createContainer($this->testContainerName);
-        $this->assertNotNull($container);
+        $name = 'foo';
+
+        $this->driver
+            ->expects($this->once())
+            ->method('createContainer')
+            ->willReturn(true);
+
+        $container = $this->store->createContainer($name);
+
+        $this->assertInstanceOf(Container::class, $container);
+        $this->assertEquals($name, $container->getName());
+        $this->assertTrue($container->isPrivate(), 'New containers are private by default');
+
+        // containers are stored in an in-memory cache, this call should not
+        // call createContainer on the driver again
+        $this->store->createContainer($name);
     }
 
-    public function testPrivateContainer()
+    public function testCreatePublicContainer()
     {
-        $container = $this->store->createContainer($this->testContainerName, false);
-        $this->assertFalse($container->isPrivate());
+        $this->driver
+            ->expects($this->once())
+            ->method('createContainer')
+            ->willReturn(true);
 
-        $container->setPrivate();
-        $this->store->updateContainer($container);
-        $this->assertTrue($container->isPrivate());
+        $container = $this->store->createContainer('foo', false);
+        $this->assertTrue($container->isPublic());
     }
 
-    public function testNewContainerPrivateByDefault()
+    /**
+     * @expectedException        \TreeHouse\Swift\Exception\SwiftException
+     * @expectedExceptionMessage Could not create container foo
+     */
+    public function testCreateContainerFailure()
     {
-        $container = $this->store->createContainer($this->testContainerName);
-        $this->assertTrue($container->isPrivate());
+        $this->driver
+            ->expects($this->once())
+            ->method('createContainer')
+            ->willReturn(false);
+
+        $this->store->createContainer('foo');
+    }
+
+    public function testContainerExists()
+    {
+        $container = new Container('foo');
+
+        $this->driver
+            ->expects($this->once())
+            ->method('containerExists')
+            ->with($container)
+            ->willReturn(true);
+
+        $this->assertTrue($this->store->containerExists($container));
     }
 
     public function testGetContainer()
     {
-        $this->store->createContainer($this->testContainerName);
-        $this->store->clear();
+        $name      = 'foo';
+        $container = new Container($name);
 
-        // found
-        $container = $this->store->getContainer($this->testContainerName);
-        $this->assertNotNull($container);
+        $this->driver
+            ->expects($this->once())
+            ->method('getContainer')
+            ->with($name)
+            ->willReturn($container);
 
-        // not found
-        $container = $this->store->getContainer('shouldnotexist');
-        $this->assertNull($container);
+        $this->assertSame($container, $this->store->getContainer($name));
+
+        // a second call should return a cached instance
+        $this->store->getContainer($name);
+    }
+
+    public function testGetContainerNotFound()
+    {
+        $this->driver
+            ->expects($this->once())
+            ->method('getContainer')
+            ->willReturn(null);
+
+        $this->assertNull($this->store->getContainer('foo'));
+    }
+
+    public function testUpdateContainer()
+    {
+        $container = new Container('foo');
+
+        $this->driver
+            ->expects($this->once())
+            ->method('updateContainer')
+            ->with($container)
+            ->willReturn(true);
+
+        $this->assertTrue($this->store->updateContainer($container));
     }
 
     public function testDeleteContainer()
     {
-        $container = $this->getTestContainer();
-        $this->store->deleteContainer($container);
+        $container = new Container('foo');
 
-        $this->assertNull($this->store->getContainer($this->testContainerName));
+        $this->driver
+            ->expects($this->once())
+            ->method('deleteContainer')
+            ->with($container)
+            ->willReturn(true);
+
+        $this->assertTrue($this->store->deleteContainer($container));
+    }
+
+    public function testObjectExists()
+    {
+        $object = new SwiftObject(new Container('foo'), 'bar');
+
+        $this->driver
+            ->expects($this->once())
+            ->method('objectExists')
+            ->with($object)
+            ->willReturn(true);
+
+        $this->assertTrue($this->store->objectExists($object));
     }
 
     public function testCreateObject()
     {
-        $container = $this->getTestContainer();
+        $name      = 'bar';
+        $container = new Container('foo');
+        $object    = new SwiftObject($container, $name);
 
-        $object = $this->store->createObject($container, 'foo');
-        $this->assertNotNull($object);
+        $this->driver
+            ->expects($this->once())
+            ->method('containerExists')
+            ->with($container)
+            ->willReturn(false);
 
-        $file = $this->getTempFile();
-        $object->setLocalFile(new File($file));
-        $this->store->updateObject($object);
-        unlink($file);
+        $this->driver
+            ->expects($this->once())
+            ->method('createContainer')
+            ->with($container)
+            ->willReturn(true);
 
-        // file should now exist
-        $this->assertNotNull($this->store->getObject($container, 'foo'));
+        $this->driver
+            ->expects($this->once())
+            ->method('createObject')
+            ->with($container, $name)
+            ->willReturn($object);
+
+        $this->assertSame($object, $this->store->createObject($container, $name));
+    }
+
+    public function testCreateObjectOnExistingContainer()
+    {
+        $name      = 'bar';
+        $container = new Container('foo');
+        $object    = new SwiftObject($container, $name);
+
+        $this->driver
+            ->expects($this->once())
+            ->method('containerExists')
+            ->with($container)
+            ->willReturn(true);
+
+        $this->driver
+            ->expects($this->never())
+            ->method('createContainer')
+            ->with($container)
+            ->willReturn(true);
+
+        $this->driver
+            ->expects($this->once())
+            ->method('createObject')
+            ->with($container, $name)
+            ->willReturn($object);
+
+        $this->assertSame($object, $this->store->createObject($container, $name));
+    }
+
+    public function testGetObject()
+    {
+        $name      = 'bar';
+        $container = new Container('foo');
+        $object    = new SwiftObject($container, $name);
+
+        $this->driver
+            ->expects($this->once())
+            ->method('getObject')
+            ->with($container, $name)
+            ->willReturn($object);
+
+        $this->assertSame($object, $this->store->getObject($container, $name));
+    }
+
+    public function testGetObjectNotFound()
+    {
+        $this->driver
+            ->expects($this->once())
+            ->method('getObject')
+            ->willReturn(null);
+
+        $this->assertNull($this->store->getObject(new Container('foo'), 'bar'));
+    }
+
+    public function testGetObjects()
+    {
+        $name      = 'bar';
+        $container = new Container('foo');
+        $object    = new SwiftObject($container, $name);
+
+        $this->driver
+            ->expects($this->once())
+            ->method('getObjects')
+            ->with($container)
+            ->willReturn([$object]);
+
+        $this->assertSame([$object], $this->store->getObjects($container));
+    }
+
+    public function testGetObjectsWithArguments()
+    {
+        $name      = 'bar';
+        $container = new Container('foo');
+        $object    = new SwiftObject($container, $name);
+
+        $prefix    = 'foo';
+        $delimiter = '/';
+        $limit     = 10;
+        $start     = 0;
+        $end       = 5;
+
+        $this->driver
+            ->expects($this->once())
+            ->method('getObjects')
+            ->with($container, $prefix . $delimiter, $delimiter, $limit, $start, $end)
+            ->willReturn([$object]);
+
+        $this->assertSame([$object], $this->store->getObjects($container, $prefix, $delimiter, $limit, $start, $end));
+    }
+
+    public function testGetObjectContent()
+    {
+        $container = new Container('foo');
+        $object    = new SwiftObject($container, 'bar');
+        $asString  = true;
+        $headers   = ['bar' => 'baz'];
+        $content   = 'foobar';
+
+        $this->driver
+            ->expects($this->once())
+            ->method('getObjectContent')
+            ->with($object, $asString, $headers)
+            ->willReturn($content);
+
+        $this->assertSame($content, $this->store->getObjectContent($object, $asString, $headers));
+    }
+
+    public function testUpdateNewObject()
+    {
+        $container = new Container('foo');
+        $object    = new SwiftObject($container, 'bar');
+
+        $this->driver
+            ->expects($this->once())
+            ->method('updateObject')
+            ->with($object)
+            ->willReturn(true);
+
+        $object->setLocalFile(new File(__FILE__));
+
+        $this->assertTrue($this->store->updateObject($object));
+    }
+
+    public function testUpdateExistingObject()
+    {
+        $container = new Container('foo');
+        $object    = new SwiftObject($container, 'bar');
+
+        $this->driver
+            ->expects($this->once())
+            ->method('updateObject')
+            ->with($object)
+            ->willReturn(true);
+
+        $this->driver
+            ->expects($this->once())
+            ->method('objectExists')
+            ->with($object)
+            ->willReturn(true);
+
+        $this->assertTrue($this->store->updateObject($object));
     }
 
     /**
      * @expectedException        \TreeHouse\Swift\Exception\SwiftException
      * @expectedExceptionMessage Cannot update a new object without a body
      */
-    public function testCreateObjectWithoutBody()
+    public function testUpdateObjectWithoutLocalFile()
     {
-        $container = $this->getTestContainer();
+        $container = new Container('foo');
+        $object    = new SwiftObject($container, 'bar');
 
-        $object = $this->store->createObject($container, 'foo');
+        $this->driver
+            ->expects($this->once())
+            ->method('objectExists')
+            ->with($object)
+            ->willReturn(false);
+
         $this->store->updateObject($object);
     }
 
-    public function testCreateObjectCascadesContainer()
+    public function testUpdateObjectMetadata()
     {
-        $container = new Container($this->testContainerName);
+        $container = new Container('foo');
+        $object    = new SwiftObject($container, 'bar');
 
-        $object = $this->store->createObject($container, 'foo');
+        $this->driver
+            ->expects($this->once())
+            ->method('updateObjectMetadata')
+            ->with($object)
+            ->willReturn(true);
 
-        $file = $this->getTempFile();
-        $object->setLocalFile(new File($file));
-        $this->store->updateObject($object);
-        unlink($file);
-
-        // container should have been created
-        $this->assertTrue($this->store->containerExists($container));
-    }
-
-    public function testCreateObjectWithSpecificName()
-    {
-        $container = $this->getTestContainer();
-
-        $name = 'foobar.tmp';
-        $file = $this->getTempFile();
-
-        $object = $this->store->createObject($container, $name);
-        $object->setLocalFile(new File($file));
-        $this->store->updateObject($object);
-        unlink($file);
-
-        // clear first
-        $this->store->clear();
-
-        // object should have the defined name
-        $this->assertEquals($name, $this->store->getObject($container, $name)->getName());
-    }
-
-    public function testGetObject()
-    {
-        $container = $this->getTestContainer();
-
-        $object = $this->store->createObject($container, 'foo');
-
-        $file = $this->getTempFile();
-        $object->setLocalFile(new File($file));
-        $this->store->updateObject($object);
-        unlink($file);
-
-        $this->store->clear();
-
-        $this->assertNotNull($this->store->getObject($container, 'foo'));
-        $this->assertNull($this->store->getObject($container, 'foobar'));
-    }
-
-    public function testGetObjects()
-    {
-        $container = $this->getTestContainer();
-
-        $file = $this->getTempFile();
-
-        $sizes = array(
-            '100/100',
-            '100/150',
-            '100/200',
-            '200/100',
-            '200/150',
-            '200/200',
-            'g/100/150',
-            'g/100/200',
-            'g/200/100',
-            'g/200/150',
-            'g/200/200',
-        );
-
-        foreach ($sizes as $size) {
-            $object = $this->store->createObject($container, $size);
-            $object->setLocalFile(new File($file));
-            $this->store->updateObject($object);
-        }
-
-        unlink($file);
-
-        // all objects
-        $objects = $this->store->getObjects($container);
-        $this->assertEquals(sizeof($sizes), sizeof($objects));
-
-        // prefix
-        $this->assertEquals(3, sizeof($this->store->getObjects($container, '100')));
-        $this->assertEquals(5, sizeof($this->store->getObjects($container, 'g')));
-        $this->assertEquals(3, sizeof($this->store->getObjects($container, 'g/200')));
-
-        // delimiter
-        $this->assertEquals(3, sizeof($this->store->getObjects($container, null, '/')));
-        $this->assertEquals(3, sizeof($this->store->getObjects($container, '200', '/')));
-        $this->assertEquals(2, sizeof($this->store->getObjects($container, 'g', '/')));
-
-        // limit
-        $limit = 4;
-        $objects = $this->store->getObjects($container, null, null, $limit);
-        $this->assertEquals($limit, sizeof($objects));
-
-        // marker
-        $this->assertEquals(8, sizeof($this->store->getObjects($container, null, null, null, '200')));
-        $this->assertEquals(5, sizeof($this->store->getObjects($container, null, null, null, null, '200/200')));
-        $this->assertEquals(2, sizeof($this->store->getObjects($container, 'g', null, null, null, 'g/200/100')));
-        $this->assertEquals(6, sizeof($this->store->getObjects($container, null, null, null, '100', 'g')));
-    }
-
-    public function testContainerMetadata()
-    {
-        $container = $this->store->createContainer('test');
-        $container->getMetadata()->set('Foo', 'Bar');
-
-        // save
-        $this->assertTrue($this->store->updateContainer($container));
-
-        // fetch again
-        $this->store->clear();
-        $newContainer = $this->store->getContainer('test');
-
-        // meta data should have been saved
-        $this->assertEquals('Bar', $newContainer->getMetadata()->get('Foo'));
-    }
-
-    public function testObjectMetadata()
-    {
-        $container = $this->getTestContainer();
-
-        $object = $this->store->createObject($container, 'foo');
-        $object->getMetadata()->set('foo', 'bar');
-
-        $file = $this->getTempFile();
-        $object->setLocalFile(new File($file));
-        $this->store->updateObject($object);
-        unlink($file);
-
-        // clear
-        $this->store->clear();
-
-        // fetch again
-        $newObject = $this->store->getObject($container, 'foo');
-        $this->assertEquals('bar', $object->getMetadata()->get('foo'));
-
-        // change
-        $object->getMetadata()->set('foo', 'foobar');
         $this->assertTrue($this->store->updateObjectMetadata($object));
-
-        // fetch again
-        $this->store->clear();
-        $newObject = $this->store->getObject($container, 'foo');
-
-        // meta data should have been saved
-        $this->assertEquals('foobar', $newObject->getMetadata()->get('foo'));
-    }
-
-    public function testGetObjectFetchesMetadata()
-    {
-        $container = $this->getTestContainer();
-
-        $object = $this->store->createObject($container, 'foo');
-        $object->getMetadata()->set('foo', 'bar');
-
-        $file = $this->getTempFile();
-        $object->setLocalFile(new File($file));
-        $this->store->updateObject($object);
-        unlink($file);
-
-        $this->store->clear();
-
-        $object = $this->store->getObject($container, 'foo');
-        $this->assertEquals('bar', $object->getMetadata()->get('foo'));
-    }
-
-    public function testGetObjectsFetchesMetadata()
-    {
-        $container = $this->getTestContainer();
-
-        $object = $this->store->createObject($container, 'foo');
-        $object->getMetadata()->set('foo', 'bar');
-
-        $file = $this->getTempFile();
-        $object->setLocalFile(new File($file));
-        $this->store->updateObject($object);
-        unlink($file);
-
-        $this->store->clear();
-
-        // get objects
-        $objects = $this->store->getObjects($container);
-        $this->assertEquals('bar', $objects[0]->getMetadata()->get('foo'));
     }
 
     public function testDeleteObject()
     {
-        $container = $this->getTestContainer();
+        $container = new Container('foo');
+        $object    = new SwiftObject($container, 'bar');
 
-        $object = $this->store->createObject($container, 'foo');
+        $this->driver
+            ->expects($this->once())
+            ->method('deleteObject')
+            ->with($object)
+            ->willReturn(true);
 
-        $file = $this->getTempFile();
-        $object->setLocalFile(new File($file));
-        $this->store->updateObject($object);
-        unlink($file);
-
-        $this->store->clear();
-
-        // object should exist
-        $this->assertNotNull($this->store->getObject($container, 'foo'));
-
-        $this->store->deleteObject($object);
-        $this->store->clear();
-
-        // object should not exist anymore
-        $this->assertNull($this->store->getObject($container, 'foo'));
+        $this->assertTrue($this->store->deleteObject($object));
     }
 
     public function testDeleteObjects()
     {
-        $container = $this->getTestContainer();
+        $container = new Container('foo');
+        $object    = new SwiftObject($container, 'bar');
 
-        // create two objects
-        $object = $this->store->createObject($container, 'foo');
+        $this->driver
+            ->expects($this->once())
+            ->method('deleteObjects')
+            ->with([$object])
+            ->willReturn(true);
 
-        $file = $this->getTempFile();
-        $object->setLocalFile(new File($file));
-        $this->store->updateObject($object);
-        unlink($file);
-
-        $object = $this->store->createObject($container, 'foo2');
-
-        $file = $this->getTempFile();
-        $object->setLocalFile(new File($file));
-        $this->store->updateObject($object);
-        unlink($file);
-
-        $this->store->deleteObjects($this->store->getObjects($container));
-        $this->store->clear();
-
-        // object should not exist anymore
-        $this->assertNull($this->store->getObject($container, 'foo'));
-        $this->assertNull($this->store->getObject($container, 'foo2'));
+        $this->assertTrue($this->store->deleteObjects([$object]));
     }
 
     public function testCopyObject()
     {
-        $container = $this->getTestContainer();
+        $container   = new Container('foo');
+        $object      = new SwiftObject($container, 'baz');
+        $destination = new Container('bar');
+        $newName     = 'qux';
+        $newObject   = new SwiftObject($destination, $newName);
 
-        $object = $this->store->createObject($container, 'foo');
+        $this->driver
+            ->expects($this->once())
+            ->method('copyObject')
+            ->with($object, $destination, $newName)
+            ->willReturn($newObject);
 
-        $file = $this->getTempFile();
-        $object->setLocalFile(new File($file));
-        $this->store->updateObject($object);
-        unlink($file);
+        $this->assertSame($newObject, $this->store->copyObject($object, $destination, $newName));
+    }
 
-        // copy to new container
-        $newContainerName = 'container2';
-        $newContainer = $this->store->createContainer($newContainerName);
+    public function testCopyObjectDefaultName()
+    {
+        $container   = new Container('foo');
+        $object      = new SwiftObject($container, 'baz');
+        $destination = new Container('bar');
+        $newObject   = new SwiftObject($destination, $object->getName());
 
-        $newObject = $this->store->copyObject($object, $newContainer);
+        $this->driver
+            ->expects($this->once())
+            ->method('copyObject')
+            ->with($object, $destination, $object->getName())
+            ->willReturn($newObject);
 
-        // returned object must exist
-        $this->assertNotNull($newObject);
+        $this->assertSame($newObject, $this->store->copyObject($object, $destination));
+    }
 
-        // when fetched again, it must exist
-        $this->store->clear();
-        $this->assertNotNull($this->store->getObject($newContainer, $newObject->getName()));
+    public function testCopyObjectToSameContainer()
+    {
+        $container = new Container('foo');
+        $object    = new SwiftObject($container, 'bar');
+        $newName   = 'baz';
+        $newObject = new SwiftObject($container, $newName);
 
-        // test rename
-        $newObject = $this->store->copyObject($newObject, $newContainer, 'newname');
-        $this->assertEquals('newname', $newObject->getName());
+        $this->driver
+            ->expects($this->once())
+            ->method('copyObject')
+            ->with($object, $container, $newName)
+            ->willReturn($newObject);
+
+        $this->assertSame($newObject, $this->store->copyObject($object, $container, $newName));
     }
 
     /**
      * @expectedException        \TreeHouse\Swift\Exception\SwiftException
      * @expectedExceptionMessage Destination is same as source
      */
-    public function testCopyCircularReference()
+    public function testCopyObjectCircularReference()
     {
-        $container = $this->getTestContainer();
-        $object = $this->store->createObject($container, 'foo');
+        $container = new Container('foo');
+        $object    = new SwiftObject($container, 'baz');
 
-        $file = $this->getTempFile();
-        $object->setLocalFile(new File($file));
-        $this->store->updateObject($object);
-        unlink($file);
+        $this->driver
+            ->expects($this->never())
+            ->method('copyObject');
 
-        // copy to same container, same name
-        $this->store->copyObject($object, $object->getContainer());
-    }
-
-    protected function setUp()
-    {
-        $this->markTestIncomplete('Mock object store first');
-//        $this->store = new ObjectStore();
-//        $this->store->clear();
-    }
-
-    protected function tearDown()
-    {
-        foreach ($this->tempfiles as $tempfile) {
-            if (file_exists($tempfile)) {
-                unlink($tempfile);
-            }
-        }
-
-        if (null !== $this->testContainer) {
-            $this->deleteTestContainer();
-        }
-
-        parent::tearDown();
-    }
-
-    protected function getTempFile()
-    {
-        $this->tempfiles[] = $tempfile = tempnam(sys_get_temp_dir(), 'cdn-test-file');
-
-        return $tempfile;
-    }
-
-    protected function getTestContainer()
-    {
-        if (null === $this->testContainer) {
-            $container = $this->store->getContainer($this->testContainerName);
-            if (is_null($container)) {
-                $container = $this->store->createContainer($this->testContainerName);
-            }
-
-            $this->testContainer = $container;
-        }
-
-        return $this->testContainer;
-    }
-
-    protected function deleteTestContainer()
-    {
-        $container = $this->store->getContainer($this->testContainerName);
-        if ($container) {
-            $this->store->deleteContainer($container);
-            $this->testContainer = null;
-        }
+        $this->store->copyObject($object, $container);
     }
 }

@@ -2,25 +2,26 @@
 
 namespace TreeHouse\Swift;
 
-use Guzzle\Http\Message\Response;
+use GuzzleHttp\Message\ResponseInterface;
 use TreeHouse\Swift\Driver\DriverInterface;
 use TreeHouse\Swift\Exception\SwiftException;
+use TreeHouse\Swift\Object as SwiftObject;
 
 class ObjectStore
 {
     /**
-     * The driver that communicates with the Swift backend
+     * The driver that communicates with the Swift backend.
      *
      * @var DriverInterface
      */
     protected $driver;
 
     /**
-     * Local cache of fetched containers
+     * Local cache of fetched containers.
      *
      * @var array
      */
-    protected $containers = array();
+    protected $containers = [];
 
     /**
      * @param DriverInterface $driver
@@ -31,107 +32,108 @@ class ObjectStore
     }
 
     /**
-     * Perform HEAD request
+     * Perform HEAD request.
      *
      * @param string $path
      * @param array  $query
      * @param array  $headers
      *
-     * @return Response
+     * @return ResponseInterface
      *
      * @see DriverInterface::head()
      */
-    public function head($path, array $query = null, array $headers = array())
+    public function head($path, array $query = null, array $headers = [])
     {
         return $this->driver->head($path, $query, $headers);
     }
 
     /**
-     * Perform GET request
+     * Perform GET request.
      *
      * @param string $path
      * @param array  $query
      * @param array  $headers
      *
-     * @return Response
+     * @return ResponseInterface
      *
      * @see DriverInterface::get()
      */
-    public function get($path, array $query = null, array $headers = array())
+    public function get($path, array $query = null, array $headers = [])
     {
         return $this->driver->get($path, $query, $headers);
     }
 
     /**
-     * Perform PUT request
+     * Perform PUT request.
      *
      * @param string $path
      * @param array  $query
      * @param array  $headers
      * @param string $body
      *
-     * @return Response
+     * @return ResponseInterface
      *
      * @see DriverInterface::put()
      */
-    public function put($path, array $query = null, array $headers = array(), $body = null)
+    public function put($path, array $query = null, array $headers = [], $body = null)
     {
         return $this->driver->put($path, $query, $headers, $body);
     }
 
     /**
-     * Perform POST request
+     * Perform POST request.
      *
      * @param string $path
      * @param array  $query
      * @param array  $headers
      * @param string $body
      *
-     * @return Response
+     * @return ResponseInterface
      *
      * @see DriverInterface::post()
      */
-    public function post($path, array $query = null, array $headers = array(), $body = null)
+    public function post($path, array $query = null, array $headers = [], $body = null)
     {
         return $this->driver->post($path, $query, $headers, $body);
     }
 
     /**
-     * Perform COPY request
+     * Perform COPY request.
      *
      * @param string $path
      * @param array  $query
      * @param array  $headers
      *
-     * @return Response
+     * @return ResponseInterface
      *
      * @see DriverInterface::copy()
      */
-    public function copy($path, array $query = null, array $headers = array())
+    public function copy($path, array $query = null, array $headers = [])
     {
         return $this->driver->copy($path, $query, $headers);
     }
 
     /**
-     * Perform DELETE request
+     * Perform DELETE request.
      *
      * @param string $path
      * @param array  $query
      * @param array  $headers
+     * @param string $body
      *
-     * @return Response
+     * @return ResponseInterface
      *
      * @see DriverInterface::delete()
      */
-    public function delete($path, array $query = null, array $headers = array())
+    public function delete($path, array $query = null, array $headers = [], $body = null)
     {
-        return $this->driver->delete($path, $query, $headers);
+        return $this->driver->delete($path, $query, $headers, $body);
     }
 
     /**
-     * Return object url
+     * Return object url.
      *
-     * @param \TreeHouse\Swift\Object $object
+     * @param SwiftObject $object
      *
      * @throws Exception\SwiftException
      *
@@ -139,7 +141,7 @@ class ObjectStore
      *
      * @see DriverInterface::getObjectUrl()
      */
-    public function getObjectUrl(Object $object)
+    public function getObjectUrl(SwiftObject $object)
     {
         if ($object->getContainer()->isPrivate()) {
             throw new SwiftException('Object container is private');
@@ -149,10 +151,10 @@ class ObjectStore
     }
 
     /**
-     * Create a container
+     * Create a container.
      *
-     * @param string  $name
-     * @param boolean $private
+     * @param string $name
+     * @param bool   $private
      *
      * @throws SwiftException
      *
@@ -177,11 +179,11 @@ class ObjectStore
     }
 
     /**
-     * Check if a container exists
+     * Check if a container exists.
      *
      * @param Container $container
      *
-     * @return boolean
+     * @return bool
      *
      * @see DriverInterface::containerExists()
      */
@@ -191,7 +193,7 @@ class ObjectStore
     }
 
     /**
-     * Get container by name
+     * Get container by name.
      *
      * @param string $name
      *
@@ -209,26 +211,56 @@ class ObjectStore
     }
 
     /**
-     * Check if an object exists
+     * @param Container $container
      *
-     * @param \TreeHouse\Swift\Object $object
+     * @return bool
      *
-     * @return boolean
+     * @see DriverInterface::updateContainer()
+     */
+    public function updateContainer(Container $container)
+    {
+        return $this->driver->updateContainer($container);
+    }
+
+    /**
+     * @param Container $container
+     *
+     * @return bool
+     *
+     * @see DriverInterface::deleteContainer()
+     */
+    public function deleteContainer(Container $container)
+    {
+        if ($this->driver->deleteContainer($container)) {
+            unset($this->containers[$container->getName()]);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if an object exists.
+     *
+     * @param SwiftObject $object
+     *
+     * @return bool
      *
      * @see DriverInterface::objectExists()
      */
-    public function objectExists(Object $object)
+    public function objectExists(SwiftObject $object)
     {
         return (boolean) $this->driver->objectExists($object);
     }
 
     /**
-     * Create an object
+     * Create an object.
      *
      * @param Container $container
      * @param string    $name
      *
-     * @return \TreeHouse\Swift\Object
+     * @return SwiftObject
      *
      * @see DriverInterface::createObject()
      */
@@ -243,12 +275,12 @@ class ObjectStore
     }
 
     /**
-     * Get an object by name
+     * Get an object by name.
      *
      * @param Container $container
      * @param string    $name
      *
-     * @return \TreeHouse\Swift\Object
+     * @return SwiftObject
      *
      * @see DriverInterface::getObject()
      */
@@ -263,11 +295,11 @@ class ObjectStore
      * @param Container $container
      * @param string    $prefix
      * @param string    $delimiter
-     * @param integer   $limit
-     * @param integer   $start
-     * @param integer   $end
+     * @param int       $limit
+     * @param int       $start
+     * @param int       $end
      *
-     * @return \TreeHouse\Swift\Object[]
+     * @return SwiftObject[]
      *
      * @see DriverInterface::getObjects()
      */
@@ -284,46 +316,30 @@ class ObjectStore
     }
 
     /**
-     * @param \TreeHouse\Swift\Object $object
-     * @param boolean                 $asString
-     * @param array                   $headers
+     * @param SwiftObject $object
+     * @param bool        $asString
+     * @param array       $headers
      *
      * @return mixed
      *
      * @see DriverInterface::getObjectContent()
      */
-    public function getObjectContent(Object $object, $asString = true, array $headers = array())
+    public function getObjectContent(Object $object, $asString = true, array $headers = [])
     {
         return $this->driver->getObjectContent($object, $asString, $headers);
     }
 
     /**
-     * @param Container $container
-     *
-     * @return boolean
-     *
-     * @see DriverInterface::updateContainer()
-     */
-    public function updateContainer(Container $container)
-    {
-        return $this->driver->updateContainer($container);
-    }
-
-    /**
-     * @param \TreeHouse\Swift\Object $object
+     * @param SwiftObject $object
      *
      * @throws SwiftException
      *
-     * @return boolean
+     * @return bool
      *
      * @see DriverInterface::updateObject()
      */
-    public function updateObject(Object $object)
+    public function updateObject(SwiftObject $object)
     {
-        if ($object->getContainer() === null) {
-            throw new SwiftException('Object doesn\'t have a container');
-        }
-
         if (is_null($object->getLocalFile()) && !$this->objectExists($object)) {
             throw new SwiftException('Cannot update a new object without a body');
         }
@@ -332,43 +348,25 @@ class ObjectStore
     }
 
     /**
-     * @param \TreeHouse\Swift\Object $object
+     * @param SwiftObject $object
      *
-     * @return boolean
+     * @return bool
      *
      * @see DriverInterface::updateObjectMetadata()
      */
-    public function updateObjectMetadata(Object $object)
+    public function updateObjectMetadata(SwiftObject $object)
     {
         return $this->driver->updateObjectMetadata($object);
     }
 
     /**
-     * @param Container $container
+     * @param SwiftObject $object
      *
-     * @return boolean
-     *
-     * @see DriverInterface::deleteContainer()
-     */
-    public function deleteContainer(Container $container)
-    {
-        if ($this->driver->deleteContainer($container)) {
-            unset($this->containers[$container->getName()]);
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * @param \TreeHouse\Swift\Object $object
-     *
-     * @return boolean
+     * @return bool
      *
      * @see DriverInterface::deleteObject()
      */
-    public function deleteObject(Object $object)
+    public function deleteObject(SwiftObject $object)
     {
         return $this->driver->deleteObject($object);
     }
@@ -378,7 +376,7 @@ class ObjectStore
      *
      * @throws SwiftException
      *
-     * @return boolean
+     * @return bool
      *
      * @see DriverInterface::deleteObjects()
      */
@@ -388,24 +386,20 @@ class ObjectStore
     }
 
     /**
-     * @param \TreeHouse\Swift\Object $object
-     * @param Container               $destination
-     * @param string                  $name
+     * @param SwiftObject $object
+     * @param Container   $destination
+     * @param string      $name
      *
-     * @throws Exception\SwiftException
+     * @throws SwiftException
      *
-     * @return boolean
+     * @return SwiftObject
      *
      * @see DriverInterface::copyObject()
      */
-    public function copyObject(Object $object, Container $destination, $name = null)
+    public function copyObject(SwiftObject $object, Container $destination, $name = null)
     {
         if (is_null($name)) {
             $name = $object->getName();
-        }
-
-        if ($object->getContainer() === null) {
-            throw new SwiftException('Object doesn\'t have a container');
         }
 
         // detect circular reference
@@ -417,10 +411,10 @@ class ObjectStore
     }
 
     /**
-     * Clears the internal cache
+     * Clears the internal cache.
      */
     public function clear()
     {
-        $this->containers = array();
+        $this->containers = [];
     }
 }

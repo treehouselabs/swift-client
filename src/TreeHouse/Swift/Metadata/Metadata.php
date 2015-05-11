@@ -12,14 +12,14 @@ abstract class Metadata implements \IteratorAggregate, \Countable
     /**
      * @return string
      */
-    public abstract function getPrefix();
+    abstract public function getPrefix();
 
     /**
      * Constructor.
      *
      * @param array $metadata
      */
-    public function __construct(array $metadata = array())
+    public function __construct(array $metadata = [])
     {
         $this->replace($metadata);
     }
@@ -35,7 +35,7 @@ abstract class Metadata implements \IteratorAggregate, \Countable
             return '';
         }
 
-        $max = max(array_map('strlen', array_keys($this->metadata))) + 1;
+        $max     = max(array_map('strlen', array_keys($this->metadata))) + 1;
         $content = '';
         ksort($this->metadata);
         foreach ($this->metadata as $name => $value) {
@@ -71,9 +71,9 @@ abstract class Metadata implements \IteratorAggregate, \Countable
      *
      * @param array $metadata
      */
-    public function replace(array $metadata = array())
+    public function replace(array $metadata = [])
     {
-        $this->metadata = array();
+        $this->metadata = [];
         $this->add($metadata);
     }
 
@@ -92,8 +92,9 @@ abstract class Metadata implements \IteratorAggregate, \Countable
     /**
      * Returns a metadata value by name.
      *
-     * @param  string  $key     The header name
-     * @param  mixed   $default The default value
+     * @param string $key     The header name
+     * @param mixed  $default The default value
+     *
      * @return string
      */
     public function get($key, $default = null)
@@ -120,15 +121,16 @@ abstract class Metadata implements \IteratorAggregate, \Countable
             $value = reset($value);
         }
 
-        $key = $this->normalizeKey($key);
+        $key                  = $this->normalizeKey($key);
         $this->metadata[$key] = $value;
     }
 
     /**
      * Returns true if the key is defined.
      *
-     * @param  string $key
-     * @return boolean
+     * @param string $key
+     *
+     * @return bool
      */
     public function has($key)
     {
@@ -154,10 +156,10 @@ abstract class Metadata implements \IteratorAggregate, \Countable
      */
     public function getHeaders()
     {
-        $headers = array();
+        $headers = [];
 
         foreach ($this->all() as $key => $value) {
-            $name = $this->normalizeHeader($key);
+            $name           = $this->normalizeHeader($key);
             $headers[$name] = $value;
         }
 
@@ -165,7 +167,7 @@ abstract class Metadata implements \IteratorAggregate, \Countable
     }
 
     /**
-     * Implementation for IteratorAggregate
+     * Implementation for IteratorAggregate.
      *
      * @return \ArrayIterator
      */
@@ -175,9 +177,9 @@ abstract class Metadata implements \IteratorAggregate, \Countable
     }
 
     /**
-     * Implementation for Countable
+     * Implementation for Countable.
      *
-     * @return integer
+     * @return int
      */
     public function count()
     {
@@ -187,8 +189,9 @@ abstract class Metadata implements \IteratorAggregate, \Countable
     /**
      * Returns whether the given key is prefixed.
      *
-     * @param  string  $key
-     * @return boolean
+     * @param string $key
+     *
+     * @return bool
      */
     public function isPrefixedKey($key)
     {
@@ -200,7 +203,8 @@ abstract class Metadata implements \IteratorAggregate, \Countable
      *
      * Example: Foo returns X-Meta-Foo
      *
-     * @param  string $key
+     * @param string $key
+     *
      * @return string
      */
     protected function getPrefixedKey($key)
@@ -213,7 +217,8 @@ abstract class Metadata implements \IteratorAggregate, \Countable
      *
      * Example: X-Meta-Foo returns Foo
      *
-     * @param  string $key
+     * @param string $key
+     *
      * @return string
      */
     protected function getUnprefixedKey($key)
@@ -227,7 +232,8 @@ abstract class Metadata implements \IteratorAggregate, \Countable
      *
      * Example: X_META_foo-bar => x-meta-foo-bar
      *
-     * @param  string $key
+     * @param string $key
+     *
      * @return string
      */
     protected function normalizeKey($key)
@@ -241,7 +247,8 @@ abstract class Metadata implements \IteratorAggregate, \Countable
      *
      * Example: x-meta-foo-bar => X-Meta-Foo-Bar
      *
-     * @param  string $header
+     * @param string $header
+     *
      * @return string
      */
     protected function normalizeHeader($header)
