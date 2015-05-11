@@ -345,9 +345,12 @@ EOT;
         $name      = 'bar';
         $container = new Container($name);
 
+        $request  = $this->getMockForAbstractClass(RequestInterface::class);
+        $response = $this->getMockForAbstractClass(ResponseInterface::class);
+
         $this->mockClientRequest('get',    $name,          [], null, new Response(200, [], Stream::factory("foo\nbar/\nbar/baz\nbar/qux\n")));
         $this->mockClientRequest('head',   $name . '/foo', [], null, new Response(204));
-        $this->mockClientRequest('head',   $name . '/bar/baz', [], null, $this->getMockBuilder(BadResponseException::class)->disableOriginalConstructor()->getMock());
+        $this->mockClientRequest('head',   $name . '/bar/baz', [], null, new BadResponseException('', $request, $response));
         $this->mockClientRequest('head',   $name . '/bar/qux', [], null, new Response(204));
 
         $this->driver->getObjects($container);
@@ -474,8 +477,11 @@ EOT;
             new SwiftObject($container, 'baz'),
         ];
 
+        $request  = $this->getMockForAbstractClass(RequestInterface::class);
+        $response = $this->getMockForAbstractClass(ResponseInterface::class);
+
         $this->mockClientRequest('delete', $objects[0]->getPath(), [], null, new Response(204));
-        $this->mockClientRequest('delete', $objects[1]->getPath(), [], null, $this->getMockBuilder(BadResponseException::class)->disableOriginalConstructor()->getMock());
+        $this->mockClientRequest('delete', $objects[1]->getPath(), [], null, new BadResponseException('', $request, $response));
 
         $this->driver->deleteObjects($objects);
     }
