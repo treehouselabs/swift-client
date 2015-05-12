@@ -5,6 +5,7 @@ namespace TreeHouse\Swift\Tests\Swift\Driver;
 use GuzzleHttp\Client;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\BadResponseException;
+use GuzzleHttp\Exception\ParseException;
 use GuzzleHttp\Message\RequestInterface;
 use GuzzleHttp\Message\Response;
 use GuzzleHttp\Message\ResponseInterface;
@@ -94,12 +95,40 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
         ];
     }
 
+    /**
+     * @expectedException \TreeHouse\Swift\Exception\SwiftException
+     */
+    public function testRequestWithoutResponse()
+    {
+        $request = $this->getMockForAbstractClass(RequestInterface::class);
+        $exception = new BadResponseException('', $request);
+
+        $this->mockClientRequest('get', '/foo', [], null, $exception);
+        $this->driver->get('/foo');
+    }
+
     public function testGetObjectUrl()
     {
         $container = new Container('foo');
         $object    = new SwiftObject($container, 'bar');
 
         $this->assertEquals($this->url . '/foo/bar', $this->driver->getObjectUrl($object));
+    }
+
+    public function testContainerExists()
+    {
+        $container = new Container('foo');
+
+        $this->mockClientRequest('head', $container->getName(), [], null, new Response(204));
+        $this->assertTrue($this->driver->containerExists($container));
+    }
+
+    public function testContainerNotExists()
+    {
+        $container = new Container('foo');
+
+        $this->mockClientRequest('head', $container->getName(), [], null, new Response(404));
+        $this->assertFalse($this->driver->containerExists($container));
     }
 
     public function testCreateContainer()
@@ -313,28 +342,25 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
         $name      = 'foo';
         $container = new Container($name);
         $contents  = <<<EOT
-foo
 bar/
 bar/baz
 bar/qux
 EOT;
 
         $this->mockClientRequest('get',    $name,          [], null, new Response(200, [], Stream::factory($contents)));
-        $this->mockClientRequest('head',   $name . '/foo', [], null, new Response(204));
         $this->mockClientRequest('head',   $name . '/bar/baz', [], null, new Response(204));
         $this->mockClientRequest('head',   $name . '/bar/qux', [], null, new Response(204));
 
         /** @var SwiftObject[] $objects */
-        $objects = $this->driver->getObjects($container, null, '/');
+        $objects = $this->driver->getObjects($container, 'bar/', '/', 10, 0, 5);
 
-        $this->assertCount(4, $objects);
-        $this->assertInstanceOf(SwiftObject::class, $objects[1]);
-        $this->assertSame($container, $objects[1]->getContainer());
-        $this->assertTrue($objects[1]->isPseudoDir());
-        $this->assertSame('foo/foo', $objects[0]->getPath());
-        $this->assertSame('foo/bar/', $objects[1]->getPath());
-        $this->assertSame('foo/bar/baz', $objects[2]->getPath());
-        $this->assertSame('foo/bar/qux', $objects[3]->getPath());
+        $this->assertCount(3, $objects);
+        $this->assertInstanceOf(SwiftObject::class, $objects[0]);
+        $this->assertSame($container, $objects[0]->getContainer());
+        $this->assertTrue($objects[0]->isPseudoDir());
+        $this->assertSame('foo/bar/', $objects[0]->getPath());
+        $this->assertSame('foo/bar/baz', $objects[1]->getPath());
+        $this->assertSame('foo/bar/qux', $objects[2]->getPath());
     }
 
     /**

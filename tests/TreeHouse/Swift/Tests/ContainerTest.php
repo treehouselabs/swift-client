@@ -2,6 +2,7 @@
 
 namespace TreeHouse\Swift\Tests\Swift;
 
+use Symfony\Component\HttpFoundation\HeaderBag;
 use TreeHouse\Swift\Container;
 use TreeHouse\Swift\Metadata\Metadata;
 
@@ -15,6 +16,7 @@ class ContainerTest extends \PHPUnit_Framework_TestCase
         $this->assertSame('foo', $container->getName());
         $this->assertInternalType('array', $container->getHeaders());
         $this->assertEmpty($container->getHeaders());
+        $this->assertInstanceOf(HeaderBag::class, $container->getHeaderBag());
         $this->assertInstanceOf(Metadata::class, $container->getMetadata());
         $this->assertEmpty($container->getMetadata());
     }
@@ -41,6 +43,7 @@ class ContainerTest extends \PHPUnit_Framework_TestCase
         $container->setHeaders(['foo' => 'bar']);
         $container->getMetadata()->set('bar', 'baz');
 
+        $this->assertEquals('bar', $container->getHeader('foo'));
         $this->assertEquals(
             [
                 'foo'                  => ['bar'],

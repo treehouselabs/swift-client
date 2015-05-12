@@ -2,6 +2,7 @@
 
 namespace TreeHouse\Swift\Tests\Swift;
 
+use GuzzleHttp\Message\Response;
 use Symfony\Component\HttpFoundation\File\File;
 use TreeHouse\Swift\Container;
 use TreeHouse\Swift\Driver\DriverInterface;
@@ -31,10 +32,17 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
      */
     public function testHttpMethod($method, array $args)
     {
-        $mock = $this->driver->expects($this->once())->method($method);
+        $response = new Response(200);
+
+        $mock = $this->driver
+            ->expects($this->once())
+            ->method($method)
+            ->willReturn($response)
+        ;
+
         call_user_func_array([$mock, 'with'], $args);
 
-        call_user_func_array([$this->store, $method], $args);
+        $this->assertSame($response, call_user_func_array([$this->store, $method], $args));
     }
 
     public function httpMethodsProvider()
@@ -45,11 +53,12 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
         $body    = 'foobar';
 
         return [
-            ['head', [$path, $query, $headers]],
-            ['get', [$path, $query, $headers]],
-            ['post', [$path, $query, $headers, $body]],
-            ['put', [$path, $query, $headers, $body]],
+            ['head',   [$path, $query, $headers]],
+            ['get',    [$path, $query, $headers]],
+            ['post',   [$path, $query, $headers, $body]],
+            ['put',    [$path, $query, $headers, $body]],
             ['delete', [$path, $query, $headers, $body]],
+            ['copy',   [$path, $query, $headers]],
         ];
     }
 
@@ -155,6 +164,27 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
         $this->store->getContainer($name);
     }
 
+    public function testClear()
+    {
+        $name      = 'foo';
+        $container = new Container($name);
+
+        $this->driver
+            ->expects($this->exactly(2))
+            ->method('getContainer')
+            ->with($name)
+            ->willReturn($container);
+
+        // first call, container will be cached
+        $this->assertSame($container, $this->store->getContainer($name));
+
+        // clear the store
+        $this->store->clear();
+
+        // a second call should fetch the container again
+        $this->assertSame($container, $this->store->getContainer($name));
+    }
+
     public function testGetContainerNotFound()
     {
         $this->driver
@@ -189,6 +219,19 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
             ->willReturn(true);
 
         $this->assertTrue($this->store->deleteContainer($container));
+    }
+
+    public function testDeleteContainerFails()
+    {
+        $container = new Container('foo');
+
+        $this->driver
+            ->expects($this->once())
+            ->method('deleteContainer')
+            ->with($container)
+            ->willReturn(false);
+
+        $this->assertFalse($this->store->deleteContainer($container));
     }
 
     public function testObjectExists()
