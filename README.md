@@ -14,7 +14,6 @@ composer require treehouselabs/swift-client:~1.0
 ## Usage
 
 ```php
-use TreeHouse\Cache\CacheInterface;
 use TreeHouse\Keystone\Client\ClientFactory;
 use TreeHouse\Keystone\Client\Model\Tenant;
 
