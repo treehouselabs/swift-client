@@ -148,7 +148,7 @@ class SwiftDriver implements DriverInterface
         $response = $this->head($name);
 
         return $this->assertResponse($response, [
-            200 => Container::create($name, $response->getHeaders()),
+            204 => Container::create($name, $response->getHeaders()),
             404 => null
         ]);
     }
