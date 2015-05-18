@@ -191,7 +191,7 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
     {
         $name = 'foo';
 
-        $this->mockClientRequest('head', $name, [], null, new Response(200, ['X-Container-Meta-Read' => '.r:*']));
+        $this->mockClientRequest('head', $name, [], null, new Response(204, ['X-Container-Meta-Read' => '.r:*']));
 
         $container = $this->driver->getContainer($name);
 
@@ -224,7 +224,7 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
         $name = 'foo';
         $container = new Container($name);
 
-        $this->mockClientRequest('get', $name, [], null, new Response(204));
+        $this->mockClientRequest('get', $name, [], null, new Response(200));
         $this->mockClientRequest('delete', $name, [], null, new Response(204));
 
         $this->assertTrue($this->driver->deleteContainer($container));
