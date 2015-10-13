@@ -5,17 +5,14 @@ namespace TreeHouse\Swift\Tests\Swift\Driver;
 use GuzzleHttp\Client;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\BadResponseException;
-use GuzzleHttp\Exception\ParseException;
-use GuzzleHttp\Message\RequestInterface;
-use GuzzleHttp\Message\Response;
-use GuzzleHttp\Message\ResponseInterface;
-use GuzzleHttp\Stream\Stream;
-use GuzzleHttp\Subscriber\Mock;
-use Prophecy\Argument;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Response;
+use Psr\Http\Message\ResponseInterface;
 use Symfony\Component\HttpFoundation\File\File;
 use TreeHouse\Swift\Container;
-use TreeHouse\Swift\Object as SwiftObject;
 use TreeHouse\Swift\Driver\SwiftDriver;
+use TreeHouse\Swift\Object as SwiftObject;
 
 class SwiftDriverTest extends \PHPUnit_Framework_TestCase
 {
@@ -30,9 +27,9 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
     protected $driver;
 
     /**
-     * @var Mock
+     * @var MockHandler
      */
-    protected $responses;
+    protected $handler;
 
     /**
      * @var string
@@ -41,16 +38,14 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
 
     protected function setUp()
     {
-        $this->client    = new Client(['base_url' => $this->url]);
-        $this->driver    = new SwiftDriver($this->client);
-        $this->responses = new Mock();
-
-        $this->client->getEmitter()->attach($this->responses);
+        $this->handler = new MockHandler();
+        $this->client = new Client(['base_uri' => $this->url, 'handler' => $this->handler]);
+        $this->driver = new SwiftDriver($this->client);
     }
 
     protected function tearDown()
     {
-        if ($this->responses->count() > 0) {
+        if ($this->handler->count() > 0) {
             $this->fail('Not all responses were given');
         }
     }
@@ -62,13 +57,19 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
 
     public function testGetBaseUrl()
     {
-        $this->assertSame($this->url, $this->driver->getBaseUrl());
+        $this->assertSame($this->url, (string) $this->driver->getBaseUri());
     }
 
     /**
      * @dataProvider httpMethodsProvider
+     *
+     * @param string $method
+     * @param string $path
+     * @param array  $query
+     * @param array  $headers
+     * @param null   $body
      */
-    public function testHttpMethod($method, $path, $query, $headers, $body = null)
+    public function testHttpMethod($method, $path, array $query, array $headers, $body = null)
     {
         $url = $this->url . $path . '?' . http_build_query($query);
 
@@ -79,12 +80,15 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
         $this->assertSame($response, $this->driver->$method($path, $query, $headers, $body));
     }
 
+    /**
+     * @return array
+     */
     public function httpMethodsProvider()
     {
-        $path    = '/foo';
-        $query   = ['bar' => 'baz'];
+        $path = '/foo';
+        $query = ['bar' => 'baz'];
         $headers = ['baz' => 'qux'];
-        $body    = 'foobar';
+        $body = 'foobar';
 
         return [
             ['head',   $path, $query, $headers],
@@ -100,8 +104,7 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
      */
     public function testRequestWithoutResponse()
     {
-        $request = $this->getMockForAbstractClass(RequestInterface::class);
-        $exception = new BadResponseException('', $request);
+        $exception = $this->getBadResponseExceptionMock();
 
         $this->mockClientRequest('get', '/foo', [], null, $exception);
         $this->driver->get('/foo');
@@ -110,7 +113,7 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
     public function testGetObjectUrl()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
+        $object = new SwiftObject($container, 'bar');
 
         $this->assertEquals($this->url . '/foo/bar', $this->driver->getObjectUrl($object));
     }
@@ -133,7 +136,7 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
 
     public function testCreateContainer()
     {
-        $name    = 'foo';
+        $name = 'foo';
         $headers = ['foo' => ['bar']];
 
         $this->mockClientRequest('put', $name, $headers, null, new Response(201));
@@ -146,7 +149,7 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
 
     public function testCreateContainerAlreadyExists()
     {
-        $name    = 'foo';
+        $name = 'foo';
         $headers = ['foo' => ['bar']];
 
         $this->mockClientRequest('put', $name, $headers, null, new Response(202));
@@ -162,7 +165,7 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
      */
     public function testCreateContainerFailure()
     {
-        $name    = 'foo';
+        $name = 'foo';
         $headers = ['foo' => ['bar']];
 
         $this->mockClientRequest('put', $name, $headers, null, new Response(500));
@@ -175,7 +178,7 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
 
     public function testCreatePublicContainer()
     {
-        $name    = 'foo';
+        $name = 'foo';
         $headers = ['foo' => ['bar']];
 
         $this->mockClientRequest('put', $name, array_merge($headers, ['X-Container-Meta-Read' => '.r:*']), null, new Response(201));
@@ -235,7 +238,7 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
         $name = 'foo';
         $container = new Container($name);
 
-        $this->mockClientRequest('get',    $name,          [], null, new Response(200, [], Stream::factory("foo\nbar")));
+        $this->mockClientRequest('get',    $name,          [], null, new Response(200, [], "foo\nbar"));
         $this->mockClientRequest('head',   $name . '/foo', [], null, new Response(204));
         $this->mockClientRequest('head',   $name . '/bar', [], null, new Response(204));
         $this->mockClientRequest('delete', $name . '/foo', [], null, new Response(204));
@@ -284,7 +287,7 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
     public function testCreateObjectFromResponse()
     {
         $container = new Container('foo');
-        $response = new Response(200, ['foo' => 'bar', 'X-Object-Meta-Bar' => 'baz'], Stream::factory('test'));
+        $response = new Response(200, ['foo' => 'bar', 'X-Object-Meta-Bar' => 'baz'], 'test');
         $object = $this->driver->createObject($container, 'bar', $response);
 
         $this->assertSame($container, $object->getContainer());
@@ -295,7 +298,7 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
 
     public function testGetObject()
     {
-        $name      = 'foo';
+        $name = 'foo';
         $container = new Container($name);
 
         $this->mockClientRequest('head', $name . '/bar', [], null, new Response(204, ['foo' => 'bar', 'X-Object-Meta-Bar' => 'baz']));
@@ -310,7 +313,7 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
 
     public function testGetObjectNotFound()
     {
-        $name      = 'foo';
+        $name = 'foo';
         $container = new Container($name);
 
         $this->mockClientRequest('head', $name . '/bar', [], null, new Response(404));
@@ -320,10 +323,10 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
 
     public function testGetObjects()
     {
-        $name      = 'bar';
+        $name = 'bar';
         $container = new Container($name);
 
-        $this->mockClientRequest('get',    $name,          [], null, new Response(200, [], Stream::factory("foo\nbar")));
+        $this->mockClientRequest('get',    $name,          [], null, new Response(200, [], "foo\nbar"));
         $this->mockClientRequest('head',   $name . '/foo', [], null, new Response(204));
         $this->mockClientRequest('head',   $name . '/bar', [], null, new Response(204));
 
@@ -339,15 +342,15 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
 
     public function testGetObjectsWithDirectories()
     {
-        $name      = 'foo';
+        $name = 'foo';
         $container = new Container($name);
-        $contents  = <<<EOT
+        $contents = <<<EOT
 bar/
 bar/baz
 bar/qux
 EOT;
 
-        $this->mockClientRequest('get',    $name,          [], null, new Response(200, [], Stream::factory($contents)));
+        $this->mockClientRequest('get',    $name,          [], null, new Response(200, [], $contents));
         $this->mockClientRequest('head',   $name . '/bar/baz', [], null, new Response(204));
         $this->mockClientRequest('head',   $name . '/bar/qux', [], null, new Response(204));
 
@@ -368,15 +371,14 @@ EOT;
      */
     public function testGetObjectsWithFailures()
     {
-        $name      = 'bar';
+        $name = 'bar';
         $container = new Container($name);
 
-        $request  = $this->getMockForAbstractClass(RequestInterface::class);
-        $response = $this->getMockForAbstractClass(ResponseInterface::class);
+        $exception = $this->getBadResponseExceptionMock();
 
-        $this->mockClientRequest('get',    $name,          [], null, new Response(200, [], Stream::factory("foo\nbar/\nbar/baz\nbar/qux\n")));
+        $this->mockClientRequest('get',    $name,          [], null, new Response(200, [], "foo\nbar/\nbar/baz\nbar/qux\n"));
         $this->mockClientRequest('head',   $name . '/foo', [], null, new Response(204));
-        $this->mockClientRequest('head',   $name . '/bar/baz', [], null, new BadResponseException('', $request, $response));
+        $this->mockClientRequest('head',   $name . '/bar/baz', [], null, $exception);
         $this->mockClientRequest('head',   $name . '/bar/qux', [], null, new Response(204));
 
         $this->driver->getObjects($container);
@@ -385,9 +387,9 @@ EOT;
     public function testGetObjectContent()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
+        $object = new SwiftObject($container, 'bar');
 
-        $this->mockClientRequest('get', $object->getPath(), [], null, new Response(200, [], Stream::factory('test')));
+        $this->mockClientRequest('get', $object->getPath(), [], null, new Response(200, [], 'test'));
 
         $this->assertSame('test', $this->driver->getObjectContent($object));
     }
@@ -398,7 +400,7 @@ EOT;
     public function testGetObjectContentNotFound()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
+        $object = new SwiftObject($container, 'bar');
 
         $this->mockClientRequest('get', $object->getPath(), [], null, new Response(404));
 
@@ -408,7 +410,7 @@ EOT;
     public function testUpdateObjectWithoutContentModification()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
+        $object = new SwiftObject($container, 'bar');
 
         $this->mockClientRequest('post', $container->getName(), [], null, new Response(204));
         $this->mockClientRequest('post', $object->getPath(), [], null, new Response(202));
@@ -419,7 +421,7 @@ EOT;
     public function testUpdateModifiedObject()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
+        $object = new SwiftObject($container, 'bar');
         $object->setLocalFile(new File(__FILE__));
 
         $this->mockClientRequest('post', $container->getName(), [], null, new Response(204));
@@ -434,7 +436,7 @@ EOT;
     public function testUpdateObjectUnexpectedResponse()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
+        $object = new SwiftObject($container, 'bar');
         $object->setLocalFile(new File(__FILE__));
 
         $this->mockClientRequest('post', $container->getName(), [], null, new Response(204));
@@ -446,7 +448,7 @@ EOT;
     public function testUpdateObjectMetadata()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
+        $object = new SwiftObject($container, 'bar');
 
         $this->mockClientRequest('post', $object->getPath(), [], null, new Response(202));
 
@@ -456,7 +458,7 @@ EOT;
     public function testDeleteObject()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
+        $object = new SwiftObject($container, 'bar');
 
         $this->mockClientRequest('delete', $object->getPath(), [], null, new Response(204));
 
@@ -466,7 +468,7 @@ EOT;
     public function testDeleteNotFoundObject()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
+        $object = new SwiftObject($container, 'bar');
 
         $this->mockClientRequest('delete', $object->getPath(), [], null, new Response(404));
 
@@ -478,7 +480,7 @@ EOT;
         $container = new Container('foo');
 
         /** @var SwiftObject[] $objects */
-        $objects   = [
+        $objects = [
             new SwiftObject($container, 'foo/'),
             new SwiftObject($container, 'foo/bar'),
             new SwiftObject($container, 'foo/baz'),
@@ -498,16 +500,15 @@ EOT;
         $container = new Container('foo');
 
         /** @var SwiftObject[] $objects */
-        $objects   = [
+        $objects = [
             new SwiftObject($container, 'bar'),
             new SwiftObject($container, 'baz'),
         ];
 
-        $request  = $this->getMockForAbstractClass(RequestInterface::class);
-        $response = $this->getMockForAbstractClass(ResponseInterface::class);
+        $exception = $this->getBadResponseExceptionMock();
 
         $this->mockClientRequest('delete', $objects[0]->getPath(), [], null, new Response(204));
-        $this->mockClientRequest('delete', $objects[1]->getPath(), [], null, new BadResponseException('', $request, $response));
+        $this->mockClientRequest('delete', $objects[1]->getPath(), [], null, $exception);
 
         $this->driver->deleteObjects($objects);
     }
@@ -517,31 +518,25 @@ EOT;
         $container = new Container('foo');
 
         /** @var SwiftObject[] $objects */
-        $objects   = [
+        $objects = [
             new SwiftObject($container, 'bar'),
             new SwiftObject($container, 'baz'),
         ];
 
-        $request  = $this->getMockForAbstractClass(RequestInterface::class);
-        $response = $this->getMockForAbstractClass(ResponseInterface::class);
-        $response
-            ->expects($this->any())
-            ->method('getStatusCode')
-            ->willReturn(404)
-        ;
+        $exception = new BadResponseException('', new Request('GET', $this->url), new Response(404));
 
         $this->mockClientRequest('delete', $objects[0]->getPath(), [], null, new Response(204));
-        $this->mockClientRequest('delete', $objects[1]->getPath(), [], null, new BadResponseException('', $request, $response));
+        $this->mockClientRequest('delete', $objects[1]->getPath(), [], null, $exception);
 
         $this->assertSame(1, $this->driver->deleteObjects($objects));
     }
 
     public function testCopyObject()
     {
-        $container   = new Container('foo');
-        $object      = new SwiftObject($container, 'baz');
+        $container = new Container('foo');
+        $object = new SwiftObject($container, 'baz');
         $destination = new Container('bar');
-        $newName     = 'qux';
+        $newName = 'qux';
 
         $this->mockClientRequest('copy', $container->getName(), [], null, new Response(201));
         $this->mockClientRequest('head', $container->getName(), [], null, new Response(204, ['foo' => 'bar', 'X-Object-Meta-Bar' => 'baz']));
@@ -555,9 +550,24 @@ EOT;
         $this->assertSame('baz', $newObject->getMetadata()->get('bar'));
     }
 
+    /**
+     * @param string                       $method
+     * @param string                       $url
+     * @param array                        $headers
+     * @param mixed                        $body
+     * @param \Exception|ResponseInterface $responseOrException
+     */
     protected function mockClientRequest($method, $url, array $headers, $body = null, $responseOrException)
     {
         // TODO it would be nice if we could assert the request arguments as well
-        $this->responses->addMultiple([$responseOrException]);
+        $this->handler->append($responseOrException);
+    }
+
+    /**
+     * @return \PHPUnit_Framework_MockObject_MockObject|BadResponseException
+     */
+    protected function getBadResponseExceptionMock()
+    {
+        return $this->getMockBuilder(BadResponseException::class)->disableOriginalConstructor()->getMock();
     }
 }

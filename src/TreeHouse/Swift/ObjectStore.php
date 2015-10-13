@@ -2,7 +2,7 @@
 
 namespace TreeHouse\Swift;
 
-use GuzzleHttp\Message\ResponseInterface;
+use Psr\Http\Message\ResponseInterface;
 use TreeHouse\Swift\Driver\DriverInterface;
 use TreeHouse\Swift\Exception\SwiftException;
 use TreeHouse\Swift\Object as SwiftObject;

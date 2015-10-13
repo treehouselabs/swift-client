@@ -61,7 +61,7 @@ class ObjectTest extends \PHPUnit_Framework_TestCase
 
         $this->assertEquals(
             [
-                'foo'               => ['bar'],
+                'foo' => ['bar'],
                 'X-Object-Meta-Bar' => 'baz',
             ],
             $object->getHeaders()
@@ -75,7 +75,7 @@ class ObjectTest extends \PHPUnit_Framework_TestCase
 
         $this->assertEquals(
             [
-                'foo'               => ['bar'],
+                'foo' => ['bar'],
                 'X-Object-Meta-Bar' => 'baz',
             ],
             $object->getHeaders()
@@ -95,7 +95,7 @@ class ObjectTest extends \PHPUnit_Framework_TestCase
 
         $this->assertEquals(
             [
-                'foo'               => ['bar'],
+                'foo' => ['bar'],
                 'X-Object-Meta-Bar' => 'baz',
             ],
             $object->getUpdateHeaders()
@@ -112,13 +112,13 @@ class ObjectTest extends \PHPUnit_Framework_TestCase
     public function testFactoryMethodWithHeaders()
     {
         $object = SwiftObject::create($this->container, 'foo', [
-            'foo'               => 'bar',
+            'foo' => 'bar',
             'X-Object-Meta-Bar' => 'baz',
         ]);
 
         $this->assertEquals(
             [
-                'foo'               => ['bar'],
+                'foo' => ['bar'],
                 'X-Object-Meta-Bar' => 'baz',
             ],
             $object->getHeaders()

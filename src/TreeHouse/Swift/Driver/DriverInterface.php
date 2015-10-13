@@ -2,8 +2,8 @@
 
 namespace TreeHouse\Swift\Driver;
 
-use GuzzleHttp\Message\ResponseInterface;
-use GuzzleHttp\Stream\StreamInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
 use TreeHouse\Swift\Container;
 use TreeHouse\Swift\Exception\SwiftException;
 use TreeHouse\Swift\Object as SwiftObject;
@@ -98,7 +98,7 @@ interface DriverInterface
      *
      * @throws SwiftException When the creation failed
      *
-     * @return boolean True on success, an exception is thrown otherwise
+     * @return bool True on success, an exception is thrown otherwise
      */
     public function createContainer(Container $container);
 
@@ -109,7 +109,7 @@ interface DriverInterface
      *
      * @throws SwiftException
      *
-     * @return boolean
+     * @return bool
      */
     public function containerExists(Container $container);
 
@@ -129,7 +129,7 @@ interface DriverInterface
      *
      * @throws SwiftException When container was not found
      *
-     * @return boolean True on success, an exception is thrown otherwise
+     * @return bool True on success, an exception is thrown otherwise
      */
     public function updateContainer(Container $container);
 
@@ -138,7 +138,7 @@ interface DriverInterface
      *
      * @throws SwiftException
      *
-     * @return boolean True on success, an exception is thrown otherwise
+     * @return bool True on success, an exception is thrown otherwise
      */
     public function deleteContainer(Container $container);
 
@@ -149,7 +149,7 @@ interface DriverInterface
      *
      * @throws SwiftException
      *
-     * @return boolean
+     * @return bool
      */
     public function objectExists(SwiftObject $object);
 
@@ -220,7 +220,7 @@ interface DriverInterface
      *
      * @throws SwiftException
      *
-     * @return boolean True on success, an exception is thrown otherwise
+     * @return bool True on success, an exception is thrown otherwise
      */
     public function updateObject(SwiftObject $object);
 
@@ -229,7 +229,7 @@ interface DriverInterface
      *
      * @throws SwiftException
      *
-     * @return boolean
+     * @return bool
      */
     public function updateObjectMetadata(SwiftObject $object);
 
@@ -238,7 +238,7 @@ interface DriverInterface
      *
      * @throws SwiftException
      *
-     * @return boolean
+     * @return bool
      */
     public function deleteObject(SwiftObject $object);
 
@@ -247,7 +247,7 @@ interface DriverInterface
      *
      * @throws SwiftException
      *
-     * @return integer The number of removed objects
+     * @return int The number of removed objects
      */
     public function deleteObjects(array $objects);
 

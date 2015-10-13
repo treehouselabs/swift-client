@@ -1,3 +1,13 @@
+## v2.0.0
+### Changes
+* Upgraded Guzzle to version 6, now using PSR-7
+* Upgraded the Keystone client to version 3
+
+### BC breaks
+* Renamed `SwiftDriver::getBaseUrl => SwiftDriver::getBaseUri`. Also, instead
+  of a string, an instance of `UriInterface` is returned.
+
+
 ## v1.0.0
 
 ### Changes

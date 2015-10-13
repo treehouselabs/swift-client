@@ -42,21 +42,21 @@ class Container implements \Countable
      */
     public function __construct($name)
     {
-        $this->name     = $name;
-        $this->private  = true;
-        $this->headers  = new HeaderBag();
+        $this->name = $name;
+        $this->private = true;
+        $this->headers = new HeaderBag();
         $this->metadata = new ContainerMetadata();
     }
 
     /**
-     * @param  string     $name
-     * @param array $headers
+     * @param string $name
+     * @param array  $headers
      *
      * @return static
      */
     public static function create($name, array $headers = [])
     {
-        $container = new Container($name);
+        $container = new self($name);
         $container->setHeaders($headers);
 
         // set visibility
@@ -88,7 +88,7 @@ class Container implements \Countable
     }
 
     /**
-     * Makes the container private
+     * Makes the container private.
      */
     public function setPrivate()
     {
@@ -96,7 +96,7 @@ class Container implements \Countable
     }
 
     /**
-     * Makes the container public
+     * Makes the container public.
      */
     public function setPublic()
     {

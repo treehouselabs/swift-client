@@ -46,7 +46,7 @@ class ContainerTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals('bar', $container->getHeader('foo'));
         $this->assertEquals(
             [
-                'foo'                  => ['bar'],
+                'foo' => ['bar'],
                 'X-Container-Meta-Bar' => 'baz',
             ],
             $container->getHeaders()
@@ -60,7 +60,7 @@ class ContainerTest extends \PHPUnit_Framework_TestCase
 
         $this->assertEquals(
             [
-                'foo'                  => ['bar'],
+                'foo' => ['bar'],
                 'X-Container-Meta-Bar' => 'baz',
             ],
             $container->getHeaders()

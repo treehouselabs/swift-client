@@ -35,7 +35,7 @@ abstract class Metadata implements \IteratorAggregate, \Countable
             return '';
         }
 
-        $max     = max(array_map('strlen', array_keys($this->metadata))) + 1;
+        $max = max(array_map('strlen', array_keys($this->metadata))) + 1;
         $content = '';
         ksort($this->metadata);
         foreach ($this->metadata as $name => $value) {
@@ -121,7 +121,7 @@ abstract class Metadata implements \IteratorAggregate, \Countable
             $value = reset($value);
         }
 
-        $key                  = $this->normalizeKey($key);
+        $key = $this->normalizeKey($key);
         $this->metadata[$key] = $value;
     }
 
@@ -159,7 +159,7 @@ abstract class Metadata implements \IteratorAggregate, \Countable
         $headers = [];
 
         foreach ($this->all() as $key => $value) {
-            $name           = $this->normalizeHeader($key);
+            $name = $this->normalizeHeader($key);
             $headers[$name] = $value;
         }
 
