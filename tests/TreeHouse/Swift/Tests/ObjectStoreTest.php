@@ -2,7 +2,7 @@
 
 namespace TreeHouse\Swift\Tests\Swift;
 
-use GuzzleHttp\Message\Response;
+use GuzzleHttp\Psr7\Response;
 use Symfony\Component\HttpFoundation\File\File;
 use TreeHouse\Swift\Container;
 use TreeHouse\Swift\Driver\DriverInterface;
@@ -24,11 +24,14 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
     protected function setUp()
     {
         $this->driver = $this->getMockForAbstractClass(DriverInterface::class);
-        $this->store  = new ObjectStore($this->driver);
+        $this->store = new ObjectStore($this->driver);
     }
 
     /**
      * @dataProvider httpMethodsProvider
+     *
+     * @param string $method
+     * @param array  $args
      */
     public function testHttpMethod($method, array $args)
     {
@@ -47,10 +50,10 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
 
     public function httpMethodsProvider()
     {
-        $path    = '/foo';
-        $query   = ['bar' => 'baz'];
+        $path = '/foo';
+        $query = ['bar' => 'baz'];
         $headers = ['baz' => 'qux'];
-        $body    = 'foobar';
+        $body = 'foobar';
 
         return [
             ['head',   [$path, $query, $headers]],
@@ -77,7 +80,7 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
         $container = new Container('foo');
         $container->setPublic();
 
-        $url    = 'http://swift.example.org/container/object';
+        $url = 'http://swift.example.org/container/object';
         $object = new SwiftObject($container, 'bar');
 
         $this->driver
@@ -149,7 +152,7 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
 
     public function testGetContainer()
     {
-        $name      = 'foo';
+        $name = 'foo';
         $container = new Container($name);
 
         $this->driver
@@ -166,7 +169,7 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
 
     public function testClear()
     {
-        $name      = 'foo';
+        $name = 'foo';
         $container = new Container($name);
 
         $this->driver
@@ -249,9 +252,9 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
 
     public function testCreateObject()
     {
-        $name      = 'bar';
+        $name = 'bar';
         $container = new Container('foo');
-        $object    = new SwiftObject($container, $name);
+        $object = new SwiftObject($container, $name);
 
         $this->driver
             ->expects($this->once())
@@ -276,9 +279,9 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
 
     public function testCreateObjectOnExistingContainer()
     {
-        $name      = 'bar';
+        $name = 'bar';
         $container = new Container('foo');
-        $object    = new SwiftObject($container, $name);
+        $object = new SwiftObject($container, $name);
 
         $this->driver
             ->expects($this->once())
@@ -303,9 +306,9 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
 
     public function testGetObject()
     {
-        $name      = 'bar';
+        $name = 'bar';
         $container = new Container('foo');
-        $object    = new SwiftObject($container, $name);
+        $object = new SwiftObject($container, $name);
 
         $this->driver
             ->expects($this->once())
@@ -328,9 +331,9 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
 
     public function testGetObjects()
     {
-        $name      = 'bar';
+        $name = 'bar';
         $container = new Container('foo');
-        $object    = new SwiftObject($container, $name);
+        $object = new SwiftObject($container, $name);
 
         $this->driver
             ->expects($this->once())
@@ -343,15 +346,15 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
 
     public function testGetObjectsWithArguments()
     {
-        $name      = 'bar';
+        $name = 'bar';
         $container = new Container('foo');
-        $object    = new SwiftObject($container, $name);
+        $object = new SwiftObject($container, $name);
 
-        $prefix    = 'foo';
+        $prefix = 'foo';
         $delimiter = '/';
-        $limit     = 10;
-        $start     = 0;
-        $end       = 5;
+        $limit = 10;
+        $start = 0;
+        $end = 5;
 
         $this->driver
             ->expects($this->once())
@@ -365,10 +368,10 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
     public function testGetObjectContent()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
-        $asString  = true;
-        $headers   = ['bar' => 'baz'];
-        $content   = 'foobar';
+        $object = new SwiftObject($container, 'bar');
+        $asString = true;
+        $headers = ['bar' => 'baz'];
+        $content = 'foobar';
 
         $this->driver
             ->expects($this->once())
@@ -382,7 +385,7 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
     public function testUpdateNewObject()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
+        $object = new SwiftObject($container, 'bar');
 
         $this->driver
             ->expects($this->once())
@@ -398,7 +401,7 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
     public function testUpdateExistingObject()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
+        $object = new SwiftObject($container, 'bar');
 
         $this->driver
             ->expects($this->once())
@@ -422,7 +425,7 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
     public function testUpdateObjectWithoutLocalFile()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
+        $object = new SwiftObject($container, 'bar');
 
         $this->driver
             ->expects($this->once())
@@ -436,7 +439,7 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
     public function testUpdateObjectMetadata()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
+        $object = new SwiftObject($container, 'bar');
 
         $this->driver
             ->expects($this->once())
@@ -450,7 +453,7 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
     public function testDeleteObject()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
+        $object = new SwiftObject($container, 'bar');
 
         $this->driver
             ->expects($this->once())
@@ -464,7 +467,7 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
     public function testDeleteObjects()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
+        $object = new SwiftObject($container, 'bar');
 
         $this->driver
             ->expects($this->once())
@@ -477,11 +480,11 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
 
     public function testCopyObject()
     {
-        $container   = new Container('foo');
-        $object      = new SwiftObject($container, 'baz');
+        $container = new Container('foo');
+        $object = new SwiftObject($container, 'baz');
         $destination = new Container('bar');
-        $newName     = 'qux';
-        $newObject   = new SwiftObject($destination, $newName);
+        $newName = 'qux';
+        $newObject = new SwiftObject($destination, $newName);
 
         $this->driver
             ->expects($this->once())
@@ -494,10 +497,10 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
 
     public function testCopyObjectDefaultName()
     {
-        $container   = new Container('foo');
-        $object      = new SwiftObject($container, 'baz');
+        $container = new Container('foo');
+        $object = new SwiftObject($container, 'baz');
         $destination = new Container('bar');
-        $newObject   = new SwiftObject($destination, $object->getName());
+        $newObject = new SwiftObject($destination, $object->getName());
 
         $this->driver
             ->expects($this->once())
@@ -511,8 +514,8 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
     public function testCopyObjectToSameContainer()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'bar');
-        $newName   = 'baz';
+        $object = new SwiftObject($container, 'bar');
+        $newName = 'baz';
         $newObject = new SwiftObject($container, $newName);
 
         $this->driver
@@ -531,7 +534,7 @@ class ObjectStoreTest extends \PHPUnit_Framework_TestCase
     public function testCopyObjectCircularReference()
     {
         $container = new Container('foo');
-        $object    = new SwiftObject($container, 'baz');
+        $object = new SwiftObject($container, 'baz');
 
         $this->driver
             ->expects($this->never())

@@ -2,8 +2,8 @@
 
 namespace TreeHouse\Swift\Driver;
 
-use GuzzleHttp\Message\ResponseInterface;
-use GuzzleHttp\Stream\StreamInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
 use TreeHouse\Swift\Container;
 use TreeHouse\Swift\Exception\SwiftException;
 use TreeHouse\Swift\Object as SwiftObject;

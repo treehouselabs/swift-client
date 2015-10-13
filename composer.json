@@ -13,7 +13,7 @@
   "require": {
     "php": ">=5.5",
     "psr/log": "~1.0",
-    "guzzlehttp/guzzle": "~5.0",
+    "guzzlehttp/guzzle": "~6.0",
     "symfony/http-foundation": "~2.1",
     "treehouselabs/keystone-client": "dev-master as 3.0"
   },

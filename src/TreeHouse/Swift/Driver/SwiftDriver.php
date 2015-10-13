@@ -4,11 +4,13 @@ namespace TreeHouse\Swift\Driver;
 
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\BadResponseException;
-use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\TransferException;
-use GuzzleHttp\Message\RequestInterface;
-use GuzzleHttp\Message\ResponseInterface;
+use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Uri;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 use GuzzleHttp\Pool;
+use Psr\Http\Message\UriInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use TreeHouse\Swift\Container;
@@ -46,11 +48,11 @@ class SwiftDriver implements DriverInterface
     }
 
     /**
-     * @return string
+     * @return UriInterface
      */
-    public function getBaseUrl()
+    public function getBaseUri()
     {
-        return $this->client->getBaseUrl();
+        return $this->client->getConfig('base_uri');
     }
 
     /**
@@ -106,7 +108,7 @@ class SwiftDriver implements DriverInterface
      */
     public function getObjectUrl(SwiftObject $object)
     {
-        return sprintf('%s/%s', $this->getBaseUrl(), $object->getPath());
+        return Uri::resolve($this->getBaseUri(), $object->getPath());
     }
 
     /**
@@ -279,7 +281,7 @@ class SwiftDriver implements DriverInterface
         $result = [];
 
         $response = $this->get($container->getName(), $query);
-        $content  = trim($response->getBody(true));
+        $content  = trim($response->getBody()->getContents());
 
         if ($content !== '') {
             $requests = [];
@@ -305,7 +307,22 @@ class SwiftDriver implements DriverInterface
             if (!empty($requests)) {
                 $results = Pool::batch($this->client, $requests);
 
-                if (!empty($failures = $results->getFailures())) {
+                $failures = [];
+                foreach ($results as $index => $response) {
+                    /** @var RequestInterface $request */
+                    $request = $requests[$index];
+
+                    if ($response instanceof ResponseInterface) {
+                        $path = $request->getUri()->getPath();
+                        list(, $name) = explode('/', ltrim($path, '/'), 2);
+
+                        $result[$name] = $this->createObject($container, $name, $response);
+                    } elseif ($response instanceof \Exception) {
+                        $failures[] = $response;
+                    }
+                }
+
+                if (!empty($failures)) {
                     $messages = array_map(function (\Exception $e) {
                         return $e->getMessage();
                     }, $failures);
@@ -318,14 +335,6 @@ class SwiftDriver implements DriverInterface
                             PHP_EOL . implode(PHP_EOL, $messages)
                         )
                     );
-                }
-
-                /** @var ResponseInterface $response */
-                foreach ($results->getSuccessful() as $response) {
-                    $path = parse_url($response->getEffectiveUrl(), PHP_URL_PATH);
-                    list(, $name) = explode('/', ltrim($path, '/'), 2);
-
-                    $result[$name] = $this->createObject($container, $name, $response);
                 }
             }
         }
@@ -411,28 +420,25 @@ class SwiftDriver implements DriverInterface
         if (!empty($requests)) {
             $results = Pool::batch($this->client, $requests);
 
-            /** @var RequestException[] $failures */
-            if (!empty($failures = $results->getFailures())) {
-                $error = false;
-                foreach ($failures as $failure) {
-                    if ($failure instanceof BadResponseException && ($response = $failure->getResponse()) && ($response->getStatusCode() === 404)) {
+            $error = false;
+            foreach ($results as $index => $response) {
+                if ($response instanceof ResponseInterface) {
+                    if ($this->assertResponse($response, [204 => true])) {
+                        $numRemoved++;
+                    }
+                } elseif ($response instanceof \Exception) {
+                    // skip 404s
+                    if ($response instanceof BadResponseException && ($inner = $response->getResponse()) && ($inner->getStatusCode() === 404)) {
                         continue;
                     }
 
                     $error = true;
-                    $this->logger->error(sprintf('Error deleting: %s', $failure->getMessage()));
-                }
-
-                if ($error) {
-                    throw new SwiftException('Could not delete all objects.');
+                    $this->logger->error(sprintf('Error deleting: %s', $response->getMessage()));
                 }
             }
 
-            /** @var ResponseInterface $response */
-            foreach ($results->getSuccessful() as $response) {
-                if ($this->assertResponse($response, [204 => true])) {
-                    $numRemoved++;
-                }
+            if ($error) {
+                throw new SwiftException('Could not delete all objects.');
             }
         }
 
@@ -478,12 +484,7 @@ class SwiftDriver implements DriverInterface
             $path .= (false === strpos($path, '?') ? '?' : '&') . http_build_query($query);
         }
 
-        $options = [
-            'headers' => $headers,
-            'body'    => $body,
-        ];
-
-        return $this->client->createRequest($method, $path, $options);
+        return new Request($method, $path, $headers, $body);
     }
 
     /**
@@ -501,7 +502,7 @@ class SwiftDriver implements DriverInterface
     {
         $request = $this->createRequest($method, $path, $query, $headers, $body);
 
-        $this->logger->debug((string) $request);
+        $this->logger->debug((string) $request->getUri());
 
         try {
             return $this->client->send($request);
