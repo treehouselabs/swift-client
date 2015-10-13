@@ -5,11 +5,11 @@ namespace TreeHouse\Swift\Driver;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\BadResponseException;
 use GuzzleHttp\Exception\TransferException;
+use GuzzleHttp\Pool;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Uri;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
-use GuzzleHttp\Pool;
 use Psr\Http\Message\UriInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -120,7 +120,7 @@ class SwiftDriver implements DriverInterface
 
         return $this->assertResponse($response, [
             204 => true,
-            404 => false
+            404 => false,
         ]);
     }
 
@@ -138,7 +138,7 @@ class SwiftDriver implements DriverInterface
 
         return $this->assertResponse($response, [
             201 => true,
-            202 => true
+            202 => true,
         ]);
     }
 
@@ -151,7 +151,7 @@ class SwiftDriver implements DriverInterface
 
         return $this->assertResponse($response, [
             204 => Container::create($name, $response->getHeaders()),
-            404 => null
+            404 => null,
         ]);
     }
 
@@ -190,7 +190,7 @@ class SwiftDriver implements DriverInterface
 
         return $this->assertResponse($response, [
             204 => true,
-            404 => true
+            404 => true,
         ]);
     }
 
@@ -203,7 +203,7 @@ class SwiftDriver implements DriverInterface
 
         return $this->assertResponse($response, [
             204 => true,
-            404 => false
+            404 => false,
         ]);
     }
 
@@ -281,7 +281,7 @@ class SwiftDriver implements DriverInterface
         $result = [];
 
         $response = $this->get($container->getName(), $query);
-        $content  = trim($response->getBody()->getContents());
+        $content = trim($response->getBody()->getContents());
 
         if ($content !== '') {
             $requests = [];
@@ -294,8 +294,8 @@ class SwiftDriver implements DriverInterface
 
                     $this->logger->debug(sprintf('=> "%s"', $object->getPath()));
                 } else {
-                    $objectPath    = sprintf('%s/%s', $container->getName(), $path);
-                    $requests[]    = $this->createRequest('head', $objectPath);
+                    $objectPath = sprintf('%s/%s', $container->getName(), $path);
+                    $requests[] = $this->createRequest('head', $objectPath);
                     $result[$path] = null;
 
                     $this->logger->debug(sprintf('=> "%s"', $objectPath));
@@ -424,7 +424,7 @@ class SwiftDriver implements DriverInterface
             foreach ($results as $index => $response) {
                 if ($response instanceof ResponseInterface) {
                     if ($this->assertResponse($response, [204 => true])) {
-                        $numRemoved++;
+                        ++$numRemoved;
                     }
                 } elseif ($response instanceof \Exception) {
                     // skip 404s
@@ -453,7 +453,7 @@ class SwiftDriver implements DriverInterface
     public function copyObject(SwiftObject $object, Container $toContainer, $name)
     {
         $destination = sprintf('/%s/%s', $toContainer->getName(), $name);
-        $headers     = ['Destination' => $destination];
+        $headers = ['Destination' => $destination];
 
         $this->logger->info(sprintf('Copying "%s" => "%s"', $object->getPath(), $destination));
 

@@ -44,19 +44,19 @@ class Object
      */
     public function __construct(Container &$container, $name)
     {
-        $this->container =& $container;
-        $this->name      = $name;
-        $this->headers   = new HeaderBag();
-        $this->metadata  = new ObjectMetadata();
+        $this->container = &$container;
+        $this->name = $name;
+        $this->headers = new HeaderBag();
+        $this->metadata = new ObjectMetadata();
     }
 
     /**
-     * Factory method
+     * Factory method.
      *
-     * @param  Container       $container
-     * @param  string          $name
-     * @param  array           $headers
-     * @param  mixed           $body
+     * @param Container $container
+     * @param string    $name
+     * @param array     $headers
+     * @param mixed     $body
      *
      * @return static
      */
@@ -161,7 +161,7 @@ class Object
     }
 
     /**
-     * @param integer $bytes
+     * @param int $bytes
      */
     public function setContentLength($bytes)
     {
@@ -173,7 +173,7 @@ class Object
     }
 
     /**
-     * @return integer|null
+     * @return int|null
      */
     public function getContentLength()
     {
@@ -219,7 +219,7 @@ class Object
     }
 
     /**
-     * @return boolean
+     * @return bool
      */
     public function isPseudoDir()
     {
@@ -257,7 +257,7 @@ class Object
     /**
      * @param self $object
      *
-     * @return boolean
+     * @return bool
      */
     public function equals(Object $object)
     {

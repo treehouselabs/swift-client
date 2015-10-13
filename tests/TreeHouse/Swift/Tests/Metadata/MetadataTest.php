@@ -28,8 +28,8 @@ class MetadataTest extends \PHPUnit_Framework_TestCase
     {
         $metadata = new ConcreteMetadata(['foo' => 'bar', 'bar' => 'baz']);
         $keys = $metadata->keys();
-        $this->assertEquals("foo", $keys[0]);
-        $this->assertEquals("bar", $keys[1]);
+        $this->assertEquals('foo', $keys[0]);
+        $this->assertEquals('bar', $keys[1]);
     }
 
     public function testAll()
@@ -90,7 +90,7 @@ class MetadataTest extends \PHPUnit_Framework_TestCase
     public function testGetHeaders()
     {
         $metadata = ['foo' => 'bar', 'bar' => 'baz'];
-        $headers  = ['X-Meta-Foo' => 'bar', 'X-Meta-Bar' => 'baz'];
+        $headers = ['X-Meta-Foo' => 'bar', 'X-Meta-Bar' => 'baz'];
 
         $bag = new ConcreteMetadata($metadata);
 
@@ -99,12 +99,12 @@ class MetadataTest extends \PHPUnit_Framework_TestCase
 
     public function testGetIterator()
     {
-        $metadata   = ['foo' => 'bar', 'hello' => 'world', 'third' => 'charm'];
+        $metadata = ['foo' => 'bar', 'hello' => 'world', 'third' => 'charm'];
         $metadataBag = new ConcreteMetadata($metadata);
 
         $i = 0;
         foreach ($metadataBag as $key => $val) {
-            $i++;
+            ++$i;
             $this->assertEquals($metadata[$key], $val);
         }
 
@@ -113,7 +113,7 @@ class MetadataTest extends \PHPUnit_Framework_TestCase
 
     public function testCount()
     {
-        $metadata   = ['foo' => 'bar', 'HELLO' => 'WORLD'];
+        $metadata = ['foo' => 'bar', 'HELLO' => 'WORLD'];
         $metadataBag = new ConcreteMetadata($metadata);
 
         $this->assertEquals(count($metadata), count($metadataBag));
