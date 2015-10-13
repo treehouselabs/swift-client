@@ -1,5 +1,5 @@
 filter:
-  excluded_paths: [tests/*]
+  paths: [src/*]
 
 checks:
   php:
@@ -18,5 +18,11 @@ checks:
     fix_doc_comments: true
 
 tools:
+  php_cs_fixer: ~
+  php_pdepend: true
+  php_sim: true
+  php_changetracking: true
+  sensiolabs_security_checker: true
   external_code_coverage:
     timeout: 600
+    runs: 2

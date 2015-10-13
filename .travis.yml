@@ -1,7 +1,11 @@
+# use Docker infrastructure
 sudo: false
 
-language: php
+cache:
+  directories:
+    - $HOME/.composer/cache
 
+language: php
 php:
   - 5.5
   - 5.6
@@ -11,14 +15,16 @@ php:
 matrix:
   fast_finish: true
 
-install:
-  - composer self-update
+cache:
+  directories:
+    - $HOME/.composer/cache
 
 before_script:
-  - composer install --no-interaction
+  - travis_retry composer self-update
+  - travis_retry composer update ${COMPOSER_FLAGS} --no-interaction --prefer-source
 
 script:
-  - ./vendor/bin/phpunit --coverage-clover=coverage.clover
+  - ./vendor/bin/phpunit --coverage-text --coverage-clover=coverage.clover
 
 after_script:
-  - if [[ "$TRAVIS_PHP_VERSION" == "5.6" ]]; then php ./vendor/bin/ocular code-coverage:upload --format=php-clover coverage.clover; fi;
+  - if [[ $TRAVIS_PHP_VERSION == '5.6' ]]; then wget https://scrutinizer-ci.com/ocular.phar && php ocular.phar code-coverage:upload --format=php-clover coverage.clover; fi
