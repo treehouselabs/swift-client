@@ -52,7 +52,7 @@ class SwiftDriver implements DriverInterface
      */
     public function getBaseUri()
     {
-        return $this->client->getConfig('base_uri');
+        return new Uri($this->client->getConfig('token_pool')->getPublicUrl());
     }
 
     /**
