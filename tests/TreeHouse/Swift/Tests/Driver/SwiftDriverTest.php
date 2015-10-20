@@ -9,7 +9,9 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\UriInterface;
 use Symfony\Component\HttpFoundation\File\File;
+use TreeHouse\Keystone\Client\TokenPool;
 use TreeHouse\Swift\Container;
 use TreeHouse\Swift\Driver\SwiftDriver;
 use TreeHouse\Swift\Object as SwiftObject;
@@ -38,8 +40,16 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
 
     protected function setUp()
     {
+        $pool = $this
+            ->getMockBuilder(TokenPool::class)
+            ->setMethods(['getPublicUrl'])
+            ->disableOriginalConstructor()
+            ->getMock()
+        ;
+        $pool->expects($this->any())->method('getPublicUrl')->willReturn($this->url);
+
         $this->handler = new MockHandler();
-        $this->client = new Client(['base_uri' => $this->url, 'handler' => $this->handler]);
+        $this->client = new Client(['token_pool' => $pool, 'handler' => $this->handler]);
         $this->driver = new SwiftDriver($this->client);
     }
 
@@ -57,7 +67,10 @@ class SwiftDriverTest extends \PHPUnit_Framework_TestCase
 
     public function testGetBaseUrl()
     {
-        $this->assertSame($this->url, (string) $this->driver->getBaseUri());
+        $uri = $this->driver->getBaseUri();
+
+        $this->assertInstanceOf(UriInterface::class, $uri);
+        $this->assertSame($this->url, (string) $uri);
     }
 
     /**
